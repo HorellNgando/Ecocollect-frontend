@@ -15,7 +15,7 @@ import Notifications from './pages/Notifications'
 import Settings from './pages/Settings'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
-
+// routes 
 function App() {
   return (
     <Router>

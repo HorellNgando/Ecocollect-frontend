@@ -3,7 +3,7 @@
   "name": "ecocollect-frontend",
   "builds": [
     {
-      "src": "src/App.jsx",
+      "src": "package.json",
       "use": "@vercel/static",
       "config": {
         "distDir": "dist"

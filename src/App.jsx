@@ -15,7 +15,7 @@ import Notifications from './pages/Notifications'
 import Settings from './pages/Settings'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
-// routes 
+
 function App() {
   return (
     <Router>
@@ -38,6 +38,8 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
+          {/* Catch all route - redirect to home for any unmatched routes */}
+          <Route path="*" element={<Register />} />
         </Routes>
       </div>
     </Router>

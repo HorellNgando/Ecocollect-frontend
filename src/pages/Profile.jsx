@@ -178,10 +178,16 @@ const Profile = () => {
   }
 
   const handleLogout = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-      console.log('Déconnexion...')
-      window.location.href = '/login'
-    }
+    setShowLogoutModal(true)
+  }
+
+  const confirmLogout = () => {
+    console.log('Déconnexion...')
+    window.location.href = '/'
+  }
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false)
   }
 
   // Statistiques écologiques simulées
@@ -785,7 +791,7 @@ const Profile = () => {
         </form>
 
         {/* Bouton de déconnexion */}
-        {/* <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex justify-center">
           <button
             onClick={handleLogout}
             className="group flex items-center gap-2 rounded-xl border border-red-200 bg-white px-6 py-3 text-red-600 transition-all hover:border-red-300 hover:bg-red-50 hover:shadow-lg"
@@ -793,7 +799,36 @@ const Profile = () => {
             <LogOut className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             <span className="font-medium">Se déconnecter</span>
           </button>
-        </div> */}
+        </div>
+
+        {/* Logout Confirmation Modal */}
+        {showLogoutModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                  <LogOut className="h-8 w-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Déconnexion</h3>
+                <p className="text-gray-600 mb-6">Êtes-vous sûr de vouloir vous déconnecter ?</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={cancelLogout}
+                    className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={confirmLogout}
+                    className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+                  >
+                    Se déconnecter
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Styles pour les animations */}

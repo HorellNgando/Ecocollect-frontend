@@ -1,5 +1,13 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import Home from './pages/Home'
 import Register from './pages/Register'
+import RegisterCollector from './pages/collector/RegisterCollector'
+import DashboardCollector from './pages/collector/DashboardCollector'
+import ProfileCollector from './pages/collector/ProfileCollector'
+import MissionsCollector from './pages/collector/MissionsCollector'
+import WalletCollector from './pages/collector/WalletCollector'
+import DepositCollector from './pages/collector/DepositCollector'
+import NotificationsCollector from './pages/collector/NotificationsCollector'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -21,8 +29,9 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          <Route path="/" element={<Register />} />
+          <Route path="/" element={<Home />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/register-collector" element={<RegisterCollector />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -38,7 +47,16 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="*" element={<Register />} />
+          
+          {/* Collector Routes */}
+          <Route path="/collector/dashboard" element={<DashboardCollector />} />
+          <Route path="/collector/missions" element={<MissionsCollector />} />
+          <Route path="/collector/wallet" element={<WalletCollector />} />
+          <Route path="/collector/profile" element={<ProfileCollector />} />
+          <Route path="/collector/deposit" element={<DepositCollector />} />
+          <Route path="/collector/notifications" element={<NotificationsCollector />} />
+          
+          <Route path="*" element={<Home />} />
         </Routes>
       </div>
     </Router>

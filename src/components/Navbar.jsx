@@ -11,16 +11,23 @@ import {
   Moon
 } from 'lucide-react'
 
-const Navbar = ({ toggleSidebar, pageTitle, notifications }) => {
+const Navbar = ({ toggleSidebar, pageTitle, notifications, userRole = 'producer' }) => {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const handleLogout = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-      console.log('Déconnexion...')
-      window.location.href = '/login'
-    }
+    setShowLogoutModal(true)
+  }
+
+  const confirmLogout = () => {
+    console.log('Déconnexion...')
+    window.location.href = '/'
+  }
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false)
   }
 
   const toggleDarkMode = () => {
@@ -46,7 +53,9 @@ const Navbar = ({ toggleSidebar, pageTitle, notifications }) => {
             {/* Page title */}
             <div>
               <h1 className="text-lg font-semibold text-gray-900">{pageTitle || 'Tableau de bord'}</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">EcoCollect Platform</p>
+              <p className="text-sm text-gray-500 hidden sm:block">
+                EcoCollect - {userRole === 'collector' ? 'Espace Collecteur' : 'Plateforme de collecte'}
+              </p>
             </div>
           </div>
 
@@ -141,11 +150,13 @@ const Navbar = ({ toggleSidebar, pageTitle, notifications }) => {
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                   <div className="p-4 border-b">
                     <p className="font-medium text-gray-900">Jean Dupont</p>
-                    <p className="text-sm text-gray-500">jean.dupont@email.com</p>
+                    <p className="text-sm text-gray-500">
+                      {userRole === 'collector' ? 'Collecteur' : 'Producteur'} • jean.dupont@email.com
+                    </p>
                   </div>
                   <div className="py-2">
                     <a
-                      href="/profile"
+                      href={userRole === 'collector' ? '/collector/profile' : '/profile'}
                       className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       <User className="w-4 h-4" />
@@ -173,6 +184,35 @@ const Navbar = ({ toggleSidebar, pageTitle, notifications }) => {
           </div>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                <LogOut className="h-8 w-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Déconnexion</h3>
+              <p className="text-gray-600 mb-6">Êtes-vous sûr de vouloir vous déconnecter ?</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelLogout}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+                >
+                  Se déconnecter
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile search bar */}
       <div className="px-4 pb-3 lg:hidden">

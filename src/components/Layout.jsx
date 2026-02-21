@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 
-const Layout = ({ children, pageTitle, currentPage, notifications }) => {
+const Layout = ({ children, pageTitle, currentPage, notifications, userRole = 'producer' }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const toggleSidebar = () => {
@@ -17,6 +17,7 @@ const Layout = ({ children, pageTitle, currentPage, notifications }) => {
           isOpen={sidebarOpen} 
           toggleSidebar={toggleSidebar}
           currentPage={currentPage}
+          userRole={userRole}
         />
       </div>
 
@@ -26,6 +27,7 @@ const Layout = ({ children, pageTitle, currentPage, notifications }) => {
           isOpen={false} 
           toggleSidebar={toggleSidebar}
           currentPage={currentPage}
+          userRole={userRole}
         />
       </div>
 

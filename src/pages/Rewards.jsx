@@ -127,30 +127,7 @@ const Rewards = () => {
       color: "gray",
       benefits: ["Accès aux récompenses de base", "Badge de participation"]
     },
-    { 
-      name: "Éco-Ambitieux", 
-      minPoints: 100, 
-      maxPoints: 249, 
-      icon: Medal, 
-      color: "blue",
-      benefits: ["Récompenses exclusives", "Points bonus", "Priorité support"]
-    },
-    { 
-      name: "Éco-Héros", 
-      minPoints: 250, 
-      maxPoints: 499, 
-      icon: Star, 
-      color: "green",
-      benefits: ["Récompenses premium", "Invitations événements", "Badge spécial"]
-    },
-    { 
-      name: "Maître Recycleur", 
-      minPoints: 500, 
-      maxPoints: 999, 
-      icon: Trophy, 
-      color: "purple",
-      benefits: ["Récompenses VIP", "Partenariats exclusifs", "Certificat éco-citoyen"]
-    },
+   
     { 
       name: "Légende Éco", 
       minPoints: 1000, 

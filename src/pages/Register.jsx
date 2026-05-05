@@ -1,924 +1,2018 @@
-import { useState } from 'react'
-import { 
-  User, MapPin, Mail, Phone, Lock, Camera, Upload, 
-  Check, AlertCircle, ArrowRight, Home, Building2, Store,
-  Leaf, Recycle, Shield, Fingerprint, Globe, Sparkles,
-  ChevronRight, Eye, EyeOff, CheckCircle, XCircle
-} from 'lucide-react'
+
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import logo from '../assets/logo.jpeg';
+
+// ============================================================
+// CONSTANTES & UTILITAIRES
+// ============================================================
+
+const API_URL = '';
+
+// Types de producteurs
+const PRODUCTEUR_TYPES = {
+  menage: { label: 'Ménage', icon: '🏠', desc: 'Particulier' },
+  commerce: { label: 'Commerce', icon: '🏪', desc: 'Boutique / Resto' },
+  entreprise: { label: 'Entreprise', icon: '🏭', desc: 'PME / Industrie' },
+  administration: { label: 'Administration', icon: '🏛️', desc: 'Service public' }
+};
+
+// Types de collecteurs
+const COLLECTEUR_TYPES = {
+  independant: { label: 'Indépendant', icon: '🧑‍💼', desc: 'Rémunéré directement par mission' },
+  cooperative: { label: 'Coopérative', icon: '🤝', desc: 'Structure collective de collecte' }
+};
+
+// Évaluation de la force du mot de passe
+const evaluatePasswordStrength = (password) => {
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  const labels = ['Très faible', 'Faible', 'Moyen', 'Bon', 'Fort'];
+  return { score, label: labels[score] };
+};
+
+// Validation d'email
+const isValidEmail = (email) => /\S+@\S+\.\S+/.test(email);
+
+
 
 const Register = () => {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-    producerType: '',
-    city: '',
-    collectionPoint: '',
-    neighborhood: '',
+  // État de navigation
+  const [currentScreen, setCurrentScreen] = useState(1);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [formStep, setFormStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  // États des formulaires
+  const [producteurForm, setProducteurForm] = useState({
+    email: '', phone: '', password: '', passwordConfirm: '',
+    nomComplet: '', type: '', adresse: '', quartier: '', commune: '',
+    latitude: '', longitude: '', cgu: false
+  });
+
+  const [collecteurForm, setCollecteurForm] = useState({
+    email: '', phone: '', password: '', passwordConfirm: '',
+    nomComplet: '', type: '', identite: '', zone: '', quartiers: '', communes: '',
+    photo: null, photoCniRecto: null, photoCniVerso: null,
+    cgu: false
+  });
+
+  // États d'affichage des mots de passe
+  const [showPasswords, setShowPasswords] = useState({
+    producteur: { pwd: false, confirm: false },
+    collecteur: { pwd: false, confirm: false }
+  });
+
+  // États des erreurs
+  const [errors, setErrors] = useState({});
+
+  // Force des mots de passe
+  const [passwordStrength, setPasswordStrength] = useState({
+    producteur: { score: 0, label: 'Très faible' },
+    collecteur: { score: 0, label: 'Très faible' }
+  });
+
+  // Prévisualisations des images
+  const [previews, setPreviews] = useState({
+    photo: null,
     cniRecto: null,
-    cniVerso: null,
-    acceptTerms: false
-  })
+    cniVerso: null
+  });
 
-  const [errors, setErrors] = useState({})
-  const [isLoading, setIsLoading] = useState(false)
-  const [locationLoading, setLocationLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1)
-  const [uploadProgress, setUploadProgress] = useState({ recto: 0, verso: 0 })
+  // Refs pour les inputs de fichiers
+  const fileInputRefs = {
+    photo: useRef(null),
+    cniRecto: useRef(null),
+    cniVerso: useRef(null)
+  };
 
-  const producerTypes = [
-    { id: 'household', label: 'Ménage', icon: Home, color: 'emerald', description: 'Particulier', waste: '5-10 kg/semaine' },
-    { id: 'commerce', label: 'Commerce', icon: Store, color: 'green', description: 'Boutique, restaurant', waste: '20-50 kg/semaine' },
-    { id: 'enterprise', label: 'Entreprise', icon: Building2, color: 'teal', description: 'PME, industrie', waste: '100+ kg/semaine' }
-  ]
+  // Effets
+  useEffect(() => {
+    setFormStep(1);
+    setErrors({});
+  }, [selectedRole]);
 
-  const steps = [
-    { id: 1, label: 'Identité', icon: User },
-    { id: 2, label: 'Localisation', icon: MapPin },
-    { id: 3, label: 'Documents', icon: Shield }
-  ]
-
-  const passwordRequirements = [
-    { id: 'minLength', label: 'Au moins 6 caractères', regex: /.{6,}/ },
-    { id: 'number', label: 'Au moins 1 chiffre', regex: /\d/ },
-    { id: 'letter', label: 'Au moins 1 lettre', regex: /[a-zA-Z]/ }
-  ]
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked, files } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : type === 'file' ? files[0] : value
-    }))
-
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
+  useEffect(() => {
+    if (message.text) {
+      const timer = setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+      return () => clearTimeout(timer);
     }
-  }
+  }, [message]);
 
-  const handleLocationClick = () => {
-    setLocationLoading(true)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          // Simulation de reverse geocoding
-          setFormData(prev => ({
-            ...prev,
-            collectionPoint: `Lat: ${position.coords.latitude.toFixed(6)}, Lng: ${position.coords.longitude.toFixed(6)}`
-          }))
-          setLocationLoading(false)
-        },
-        (error) => {
-          setErrors(prev => ({
-            ...prev,
-            location: 'Impossible d\'obtenir votre position. Veuillez saisir manuellement.'
-          }))
-          setLocationLoading(false)
-        }
-      )
+  // ============================================================
+  // GESTIONNAIRES D'ÉVÉNEMENTS
+  // ============================================================
+
+  const selectRole = useCallback((role) => {
+    setSelectedRole(role);
+    setFormStep(1);
+    setErrors({});
+    setMessage({ type: '', text: '' });
+  }, []);
+
+  const goToForm = useCallback(() => {
+    if (selectedRole) {
+      setCurrentScreen(2);
+      setFormStep(1);
+    }
+  }, [selectedRole]);
+
+  const handlePasswordChange = useCallback((role, value) => {
+    const strength = evaluatePasswordStrength(value);
+    setPasswordStrength(prev => ({ ...prev, [role]: strength }));
+    
+    if (role === 'producteur') {
+      setProducteurForm(prev => ({ ...prev, password: value }));
     } else {
-      setErrors(prev => ({
-        ...prev,
-        location: 'La géolocalisation n\'est pas supportée par votre navigateur.'
-      }))
-      setLocationLoading(false)
+      setCollecteurForm(prev => ({ ...prev, password: value }));
     }
-  }
+  }, []);
 
-  const handleFileUpload = (e, side) => {
-    const file = e.target.files[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({
-          ...prev,
-          [`cni${side}`]: 'La taille du fichier ne doit pas dépasser 5MB'
-        }))
-        return
-      }
+  const handleFileUpload = useCallback((event, type) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Le fichier ne doit pas dépasser 5 Mo' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      setPreviews(prev => ({ ...prev, [type]: result }));
       
-      if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({
-          ...prev,
-          [`cni${side}`]: 'Veuillez télécharger une image valide'
-        }))
-        return
+      if (type === 'photo') {
+        setCollecteurForm(prev => ({ ...prev, photo: file }));
+      } else if (type === 'cniRecto') {
+        setCollecteurForm(prev => ({ ...prev, photoCniRecto: file }));
+      } else if (type === 'cniVerso') {
+        setCollecteurForm(prev => ({ ...prev, photoCniVerso: file }));
       }
+    };
+    reader.readAsDataURL(file);
+  }, []);
 
-      setFormData(prev => ({
-        ...prev,
-        [`cni${side}`]: file
-      }))
-
-      // Simulation de progression d'upload
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += 10
-        setUploadProgress(prev => ({ ...prev, [side.toLowerCase()]: progress }))
-        if (progress >= 100) clearInterval(interval)
-      }, 100)
-
-      if (errors[`cni${side}`]) {
-        setErrors(prev => ({
-          ...prev,
-          [`cni${side}`]: ''
-        }))
-      }
+  const getCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setMessage({ type: 'error', text: 'La géolocalisation n\'est pas supportée par votre navigateur' });
+      return;
     }
-  }
 
-  const checkPasswordStrength = () => {
-    const password = formData.password
-    if (!password) return { strength: 0, label: 'Faible', color: 'red' }
-    
-    const checks = passwordRequirements.map(req => req.regex.test(password))
-    const strength = checks.filter(Boolean).length
-    
-    if (strength === 0) return { strength: 0, label: 'Très faible', color: 'red' }
-    if (strength === 1) return { strength: 1, label: 'Faible', color: 'orange' }
-    if (strength === 2) return { strength: 2, label: 'Moyen', color: 'yellow' }
-    return { strength: 3, label: 'Fort', color: 'green' }
-  }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setProducteurForm(prev => ({
+          ...prev,
+          latitude: position.coords.latitude.toString(),
+          longitude: position.coords.longitude.toString()
+        }));
+        setMessage({ type: 'success', text: 'Position GPS obtenue avec succès !' });
+      },
+      () => {
+        setMessage({ type: 'error', text: 'Impossible d\'obtenir votre position. Vérifiez vos paramètres de localisation.' });
+      }
+    );
+  }, []);
 
-  const validateStep = (step) => {
-    const newErrors = {}
+
+  // VALIDATIONS
+ 
+
+  const validateProducteurStep = useCallback((step) => {
+    const newErrors = {};
 
     if (step === 1) {
-      if (!formData.firstName.trim()) newErrors.firstName = 'Le nom est requis'
-      if (!formData.lastName.trim()) newErrors.lastName = 'Le prénom est requis'
+      if (!producteurForm.email) newErrors.pEmail = 'Email requis';
+      else if (!isValidEmail(producteurForm.email)) newErrors.pEmail = 'Email invalide';
       
-      if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-        newErrors.email = 'L\'email n\'est pas valide'
+      if (!producteurForm.phone) newErrors.pPhone = 'Téléphone requis';
+      if (!producteurForm.password) newErrors.pPassword = 'Mot de passe requis';
+      else if (producteurForm.password.length < 8) newErrors.pPassword = 'Minimum 8 caractères';
+      
+      if (producteurForm.password !== producteurForm.passwordConfirm) {
+        newErrors.pPasswordConfirm = 'Les mots de passe ne correspondent pas';
       }
+    } 
+    else if (step === 2) {
+      if (!producteurForm.nomComplet) newErrors.pNomComplet = 'Nom complet requis';
+      if (!producteurForm.type) newErrors.pType = 'Type de producteur requis';
+    } 
+    else if (step === 3) {
+      if (!producteurForm.adresse) newErrors.pAdresse = 'Adresse requise';
+      if (!producteurForm.quartier) newErrors.pQuartier = 'Quartier requis';
+      if (!producteurForm.commune) newErrors.pCommune = 'Commune requise';
+    }
 
-      if (!formData.password) newErrors.password = 'Le mot de passe est requis'
-      else if (formData.password.length < 6) {
-        newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères'
+    setErrors(prev => ({ ...prev, ...newErrors }));
+    return Object.keys(newErrors).length === 0;
+  }, [producteurForm]);
+
+  const validateCollecteurStep = useCallback((step) => {
+    const newErrors = {};
+
+    if (step === 1) {
+      if (!collecteurForm.email) newErrors.cEmail = 'Email requis';
+      else if (!isValidEmail(collecteurForm.email)) newErrors.cEmail = 'Email invalide';
+      
+      if (!collecteurForm.phone) newErrors.cPhone = 'Téléphone requis';
+      if (!collecteurForm.password) newErrors.cPassword = 'Mot de passe requis';
+      else if (collecteurForm.password.length < 8) newErrors.cPassword = 'Minimum 8 caractères';
+      
+      if (collecteurForm.password !== collecteurForm.passwordConfirm) {
+        newErrors.cPasswordConfirm = 'Les mots de passe ne correspondent pas';
       }
-
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      }
-
-      if (!formData.producerType) newErrors.producerType = 'Le type de producteur est requis'
+    }
+    else if (step === 2) {
+      if (!collecteurForm.nomComplet) newErrors.cNomComplet = 'Nom complet requis';
+      if (!collecteurForm.type) newErrors.cType = 'Type de collecteur requis';
+    }
+    else if (step === 3) {
+      if (!collecteurForm.zone) newErrors.cZone = 'Zone de collecte requise';
+      if (!collecteurForm.photo) newErrors.cPhoto = 'Photo de profil requise';
+      if (!collecteurForm.photoCniRecto) newErrors.cCniRecto = 'Photo CNI recto requise';
+      if (!collecteurForm.photoCniVerso) newErrors.cCniVerso = 'Photo CNI verso requise';
     }
 
-    if (step === 2) {
-      if (!formData.city.trim()) newErrors.city = 'La ville est requise'
-      if (!formData.collectionPoint.trim()) newErrors.collectionPoint = 'Le point de collecte est requis'
-      if (!formData.neighborhood.trim()) newErrors.neighborhood = 'Le quartier est requis'
-    }
+    setErrors(prev => ({ ...prev, ...newErrors }));
+    return Object.keys(newErrors).length === 0;
+  }, [collecteurForm]);
 
-    if (step === 3) {
-      if (!formData.cniRecto) newErrors.cniRecto = 'La photo recto de la CNI est requise'
-      if (!formData.cniVerso) newErrors.cniVerso = 'La photo verso de la CNI est requise'
-      if (!formData.acceptTerms) newErrors.acceptTerms = 'Vous devez accepter les conditions générales'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleNextStep = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(prev => prev + 1)
-    }
-  }
-
-  const handlePrevStep = () => {
-    setCurrentStep(prev => prev - 1)
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const nextStep = useCallback((role, step) => {
+    const isValid = role === 'producteur' 
+      ? validateProducteurStep(step) 
+      : validateCollecteurStep(step);
     
-    if (!validateStep(3)) return
+    if (isValid) setFormStep(step + 1);
+  }, [validateProducteurStep, validateCollecteurStep]);
 
-    setIsLoading(true)
-    
+
+
+  const submitProducteur = useCallback(async () => {
+    if (!producteurForm.cgu) {
+      setMessage({ type: 'error', text: 'Vous devez accepter les conditions générales d\'utilisation' });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage({ type: 'info', text: 'Création de votre compte en cours...' });
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      console.log('Inscription réussie:', formData)
-      // Redirection directe vers le dashboard
-      window.location.href = '/dashboard'
-      
+      const response = await fetch(`${API_URL}/api/auth/inscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: producteurForm.email.trim(),
+          telephone: producteurForm.phone.trim(),
+          motDePasse: producteurForm.password,
+          typeProducteur: producteurForm.type,
+          nomComplet: producteurForm.nomComplet.trim(),
+          adresse: producteurForm.adresse.trim(),
+          quartier: producteurForm.quartier.trim(),
+          commune: producteurForm.commune.trim(),
+          cguAcceptees: producteurForm.cgu,
+          ...(producteurForm.latitude && { latitude: parseFloat(producteurForm.latitude) }),
+          ...(producteurForm.longitude && { longitude: parseFloat(producteurForm.longitude) })
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCurrentScreen(3);
+        if (data.token) localStorage.setItem('auth_token', data.token);
+      } else {
+        setMessage({ type: 'error', text: data.message || 'Erreur lors de l\'inscription' });
+      }
     } catch (error) {
-      setErrors(prev => ({
-        ...prev,
-        submit: 'Une erreur est survenue. Veuillez réessayer.'
-      }))
+      setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
+  }, [producteurForm]);
+
+
+const submitCollecteur = useCallback(async () => {
+  if (!collecteurForm.cgu) {
+    setMessage({ type: 'error', text: 'Vous devez accepter les conditions générales d\'utilisation' });
+    return;
   }
 
-  const passwordStrength = checkPasswordStrength()
+  setIsLoading(true);
+  setMessage({ type: 'info', text: 'Création de votre compte en cours...' });
+
+  try {
+    const formData = new FormData();
+    
+   
+    formData.append('email', collecteurForm.email.trim());
+    formData.append('telephone', collecteurForm.phone.trim());
+    formData.append('motDePasse', collecteurForm.password);
+    formData.append('typeCollecteur', collecteurForm.type);
+    formData.append('nomComplet', collecteurForm.nomComplet.trim());
+    formData.append('zoneInterventionNom', collecteurForm.zone.trim()); 
+    formData.append('cguAcceptees', collecteurForm.cgu);
+    
+    
+    if (collecteurForm.identite) {
+      formData.append('numeroIdentite', collecteurForm.identite.trim()); 
+    }
+    if (collecteurForm.quartiers) {
+      formData.append('quartiersHabituels', collecteurForm.quartiers.trim()); 
+    }
+    if (collecteurForm.communes) {
+      formData.append('communesIntervention', collecteurForm.communes.trim()); 
+    }
+    
+    if (collecteurForm.photo) {
+  formData.append('photoProfil', collecteurForm.photo);
+  }
+  if (collecteurForm.photoCniRecto) {
+  formData.append('photoCniRecto', collecteurForm.photoCniRecto);
+  }
+  if (collecteurForm.photoCniVerso) {
+   formData.append('photoCniVerso', collecteurForm.photoCniVerso);
+  }
+
+    const response = await fetch(`${API_URL}/api/collecteurs/inscription`, {
+      method: 'POST',
+      body: formData  
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setCurrentScreen(3);
+      if (data.token) localStorage.setItem('auth_token', data.token);
+    } else {
+      setMessage({ type: 'error', text: data.message || 'Erreur lors de l\'inscription' });
+    }
+  } catch (error) {
+    console.error('Erreur lors de l\'inscription:', error);
+    setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
+  } finally {
+    setIsLoading(false);
+  }
+}, [collecteurForm]);
+
+  // ============================================================
+  // RENDU DES COMPOSANTS
+  // ============================================================
+
+  const renderProgressBar = () => {
+    const steps = [
+      { label: 'Mon rôle', screen: 1 },
+      { label: 'Mes infos', screen: 2 },
+      { label: 'Confirmation', screen: 2 },
+      { label: 'C\'est parti !', screen: 3 }
+    ];
+
+    return (
+      <div className="reg-progress-steps">
+        {steps.map((step, index) => (
+          <React.Fragment key={step.label}>
+            <div className="reg-progress-step">
+              <div className={`reg-step-dot ${
+                currentScreen > step.screen || (currentScreen === step.screen && formStep > index + 1) ? 'done' :
+                currentScreen === step.screen && formStep === index + 1 ? 'active' : ''
+              }`}>
+                {currentScreen > step.screen || (currentScreen === step.screen && formStep > index + 1) ? '✓' : index + 1}
+              </div>
+              <div className={`reg-step-label ${currentScreen >= step.screen ? 'active' : ''}`}>
+                {step.label}
+              </div>
+            </div>
+            {index < steps.length - 1 && (
+              <div className={`reg-step-line ${
+                currentScreen > step.screen || (currentScreen === step.screen && formStep > index + 1) ? 'done' : ''
+              }`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMessage = () => {
+    if (!message.text) return null;
+    return <div className={`reg-message ${message.type}`}>{message.text}</div>;
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header avec design premium */}
-        <div className="text-center mb-10">
-          <div className="relative inline-flex mb-6">
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 opacity-75 blur-lg animate-pulse" />
-            <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center shadow-xl">
-              <Recycle className="h-10 w-10 text-white" />
+    <>
+      <style>{styles}</style>
+      <div className="reg-root">
+        <div className="reg-ambient reg-ambient-1" />
+        <div className="reg-ambient reg-ambient-2" />
+
+        <nav className="reg-nav">
+          <img src={logo} alt="EcoCollect" />
+          <button 
+            className="reg-nav-back" 
+            onClick={() => window.location.href = '/'}
+            type="button"
+          >
+            ← Retour à l'accueil
+          </button>
+        </nav>
+
+        <div className="reg-page">
+          <div className="reg-progress-wrap">
+            {renderProgressBar()}
+          </div>
+
+          {/* Écran 1 : Sélection du rôle */}
+          {currentScreen === 1 && (
+            <div className="reg-card">
+              <h1 className="reg-title">Quel est votre rôle ?</h1>
+              <p className="reg-subtitle">
+                Choisissez votre profil pour accéder au formulaire d'inscription adapté.
+              </p>
+              
+              <div className="reg-roles">
+                <button
+                  className={`reg-role-card ${selectedRole === 'producteur' ? 'selected' : ''}`}
+                  onClick={() => selectRole('producteur')}
+                  type="button"
+                >
+                  <div className="reg-role-check">✓</div>
+                  <div className="reg-role-icon">🏠</div>
+                  <div className="reg-role-title">Producteur</div>
+                  <div className="reg-role-desc">
+                    Vous générez des déchets et souhaitez les faire collecter.
+                  </div>
+                  <div className="reg-role-tags">
+                    <span className="reg-role-tag">Ménage</span>
+                    <span className="reg-role-tag">Commerce</span>
+                    <span className="reg-role-tag">Entreprise</span>
+                    <span className="reg-role-tag">Administration</span>
+                  </div>
+                </button>
+
+                <button
+                  className={`reg-role-card ${selectedRole === 'collecteur' ? 'selected' : ''}`}
+                  onClick={() => selectRole('collecteur')}
+                  type="button"
+                >
+                  <div className="reg-role-check">✓</div>
+                  <div className="reg-role-icon">🚛</div>
+                  <div className="reg-role-title">Collecteur</div>
+                  <div className="reg-role-desc">
+                    Vous collectez les déchets et êtes rémunéré par mission.
+                  </div>
+                  <div className="reg-role-tags">
+                    <span className="reg-role-tag">Indépendant</span>
+                    <span className="reg-role-tag">Coopérative</span>
+                  </div>
+                </button>
+              </div>
+
+              <button
+                className="reg-btn reg-btn-primary"
+                disabled={!selectedRole}
+                onClick={goToForm}
+                type="button"
+              >
+                Continuer avec ce rôle →
+              </button>
+
+              <div className="reg-link">
+                Vous avez déjà un compte ? <a href="/login">Se connecter</a>
+              </div>
             </div>
-          </div>
-          
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">
-            Rejoignez la révolution verte
-          </h1>
-          <p className="text-gray-600 max-w-md mx-auto">
-            Créez votre compte et commencez à contribuer à un environnement plus propre
-          </p>
-        </div>
+          )}
 
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex-1 relative">
-                <div className="flex items-center">
-                  <div className="relative">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                      currentStep >= step.id
-                        ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg scale-110'
-                        : 'bg-gray-200 text-gray-500'
-                    }`}>
-                      <step.icon className="h-5 w-5" />
+          {/* Écran 2 : Formulaire Producteur */}
+          {currentScreen === 2 && selectedRole === 'producteur' && (
+            <div className="reg-card">
+              <h1 className="reg-title">🏠 Inscription Producteur</h1>
+
+              {/* Étape 1 - Informations de connexion */}
+              {formStep === 1 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">1</div>
+                    <div className="reg-step-title">Informations de connexion</div>
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">✉️ Email *</label>
+                      <input
+                        className="reg-input"
+                        type="email"
+                        placeholder="nom@email.com"
+                        value={producteurForm.email}
+                        onChange={(e) => setProducteurForm(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                      {errors.pEmail && <div className="reg-error">{errors.pEmail}</div>}
                     </div>
-                    {currentStep > step.id && (
-                      <div className="absolute -top-1 -right-1">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+
+                    <div className="reg-field">
+                      <label className="reg-label">Téléphone *</label>
+                      <input
+                        className="reg-input"
+                        type="tel"
+                        placeholder="+237 XX XX XX XX"
+                        value={producteurForm.phone}
+                        onChange={(e) => setProducteurForm(prev => ({ ...prev, phone: e.target.value }))}
+                      />
+                      {errors.pPhone && <div className="reg-error">{errors.pPhone}</div>}
+                    </div>
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">🔒 Mot de passe *</label>
+                      <div className="reg-pwd-wrap">
+                        <input
+                          className="reg-input"
+                          type={showPasswords.producteur.pwd ? 'text' : 'password'}
+                          placeholder="Min. 8 caractères"
+                          value={producteurForm.password}
+                          onChange={(e) => handlePasswordChange('producteur', e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="reg-pwd-toggle"
+                          onClick={() => setShowPasswords(prev => ({
+                            ...prev,
+                            producteur: { ...prev.producteur, pwd: !prev.producteur.pwd }
+                          }))}
+                        >
+                          {showPasswords.producteur.pwd ? '🙈' : '👁️'}
+                        </button>
                       </div>
-                    )}
+                      <div className="reg-pwd-meter">
+                        <div className="reg-pwd-bars">
+                          {[1, 2, 3, 4].map(i => (
+                            <div
+                              key={i}
+                              className="reg-pwd-bar"
+                              style={{
+                                background: passwordStrength.producteur.score >= i ? '#2d8a5e' : '#d9e0d9'
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <span className="reg-pwd-label">{passwordStrength.producteur.label}</span>
+                      </div>
+                      {errors.pPassword && <div className="reg-error">{errors.pPassword}</div>}
+                    </div>
+
+                    <div className="reg-field">
+                      <label className="reg-label">🔒 Confirmer le mot de passe *</label>
+                      <div className="reg-pwd-wrap">
+                        <input
+                          className="reg-input"
+                          type={showPasswords.producteur.confirm ? 'text' : 'password'}
+                          placeholder="Confirmer"
+                          value={producteurForm.passwordConfirm}
+                          onChange={(e) => setProducteurForm(prev => ({ ...prev, passwordConfirm: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="reg-pwd-toggle"
+                          onClick={() => setShowPasswords(prev => ({
+                            ...prev,
+                            producteur: { ...prev.producteur, confirm: !prev.producteur.confirm }
+                          }))}
+                        >
+                          {showPasswords.producteur.confirm ? '🙈' : '👁️'}
+                        </button>
+                      </div>
+                      {errors.pPasswordConfirm && <div className="reg-error">{errors.pPasswordConfirm}</div>}
+                    </div>
                   </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Étape {step.id}</p>
-                    <p className="text-xs text-gray-500">{step.label}</p>
-                  </div>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`absolute top-5 left-10 right-0 h-0.5 transition-all ${
-                    currentStep > step.id ? 'bg-green-600' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Formulaire */}
-        <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
-          
-          {/* Étape 1: Informations personnelles */}
-          {currentStep === 1 && (
-            <div className="space-y-6 animate-fadeIn">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Qui êtes-vous ?</h2>
-                <p className="text-gray-600">Renseignez vos informations personnelles</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <User className="h-4 w-4 text-emerald-600" />
-                    Nom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    className={`w-full rounded-xl border-0 bg-gray-50 px-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                      errors.firstName ? 'ring-2 ring-red-500' : ''
-                    }`}
-                    placeholder="Votre nom"
-                  />
-                  {errors.firstName && (
-                    <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <User className="h-4 w-4 text-emerald-600" />
-                    Prénom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    className={`w-full rounded-xl border-0 bg-gray-50 px-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                      errors.lastName ? 'ring-2 ring-red-500' : ''
-                    }`}
-                    placeholder="Votre prénom"
-                  />
-                  {errors.lastName && (
-                    <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <Mail className="h-4 w-4 text-emerald-600" />
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className={`w-full rounded-xl border-0 bg-gray-50 pl-11 pr-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                        errors.email ? 'ring-2 ring-red-500' : ''
-                      }`}
-                      placeholder="vous@exemple.com"
-                    />
-                  </div>
-                  {errors.email && (
-                    <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <Phone className="h-4 w-4 text-emerald-600" />
-                    Téléphone
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className="w-full rounded-xl border-0 bg-gray-50 pl-11 pr-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all"
-                      placeholder="+237 6XX XXX XXX"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <Lock className="h-4 w-4 text-emerald-600" />
-                    Mot de passe <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className={`w-full rounded-xl border-0 bg-gray-50 pl-11 pr-12 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                        errors.password ? 'ring-2 ring-red-500' : ''
-                      }`}
-                      placeholder="••••••••"
-                    />
+                  <div className="reg-actions">
                     <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setCurrentScreen(1)}
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600"
                     >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      onClick={() => nextStep('producteur', 1)}
+                      type="button"
+                    >
+                      Étape suivante →
                     </button>
                   </div>
-                  {formData.password && (
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-1.5 w-full rounded-full bg-gray-200 overflow-hidden`}>
-                          <div 
-                            className={`h-full rounded-full transition-all ${
-                              passwordStrength.strength === 0 ? 'w-1/4 bg-red-500' :
-                              passwordStrength.strength === 1 ? 'w-2/4 bg-orange-500' :
-                              passwordStrength.strength === 2 ? 'w-3/4 bg-yellow-500' :
-                              'w-full bg-green-500'
-                            }`} 
+                </>
+              )}
+
+              {/* Étape 2 - Profil */}
+              {formStep === 2 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">2</div>
+                    <div className="reg-step-title">Votre profil</div>
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">👤 Nom complet / Raison sociale *</label>
+                    <input
+                      className="reg-input"
+                      placeholder="Votre nom"
+                      value={producteurForm.nomComplet}
+                      onChange={(e) => setProducteurForm(prev => ({ ...prev, nomComplet: e.target.value }))}
+                    />
+                    {errors.pNomComplet && <div className="reg-error">{errors.pNomComplet}</div>}
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">🏷️ Type de producteur *</label>
+                    <div className="reg-radio-group">
+                      {Object.entries(PRODUCTEUR_TYPES).map(([key, { label, icon, desc }]) => (
+                        <div className="reg-radio-item" key={key}>
+                          <input
+                            type="radio"
+                            name="producteurType"
+                            id={`ptype-${key}`}
+                            value={key}
+                            checked={producteurForm.type === key}
+                            onChange={(e) => setProducteurForm(prev => ({ ...prev, type: e.target.value }))}
                           />
+                          <label className="reg-radio-label" htmlFor={`ptype-${key}`}>
+                            <span className="reg-radio-icon">{icon}</span>
+                            <span className="reg-radio-title">{label}</span>
+                            <span className="reg-radio-desc">{desc}</span>
+                          </label>
                         </div>
-                        <span className={`text-xs font-medium text-${passwordStrength.color}-600`}>
-                          {passwordStrength.label}
+                      ))}
+                    </div>
+                    {errors.pType && <div className="reg-error">{errors.pType}</div>}
+                  </div>
+
+                  <div className="reg-actions">
+                    <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setFormStep(1)}
+                      type="button"
+                    >
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      onClick={() => nextStep('producteur', 2)}
+                      type="button"
+                    >
+                      Étape suivante →
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Étape 3 - Localisation */}
+              {formStep === 3 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">3</div>
+                    <div className="reg-step-title">Localisation</div>
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">📍 Adresse complète *</label>
+                    <input
+                      className="reg-input"
+                      placeholder="Rue, numéro..."
+                      value={producteurForm.adresse}
+                      onChange={(e) => setProducteurForm(prev => ({ ...prev, adresse: e.target.value }))}
+                    />
+                    {errors.pAdresse && <div className="reg-error">{errors.pAdresse}</div>}
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">🏘️ Quartier *</label>
+                      <input
+                        className="reg-input"
+                        placeholder="Quartier"
+                        value={producteurForm.quartier}
+                        onChange={(e) => setProducteurForm(prev => ({ ...prev, quartier: e.target.value }))}
+                      />
+                      {errors.pQuartier && <div className="reg-error">{errors.pQuartier}</div>}
+                    </div>
+
+                    <div className="reg-field">
+                      <label className="reg-label">🏙️ Commune *</label>
+                      <input
+                        className="reg-input"
+                        placeholder="Commune"
+                        value={producteurForm.commune}
+                        onChange={(e) => setProducteurForm(prev => ({ ...prev, commune: e.target.value }))}
+                      />
+                      {errors.pCommune && <div className="reg-error">{errors.pCommune}</div>}
+                    </div>
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">🛰️ Coordonnées GPS (optionnel)</label>
+                    <button
+                      className="reg-btn reg-btn-gps"
+                      onClick={getCurrentLocation}
+                      type="button"
+                    >
+                      📡 Utiliser ma position actuelle
+                    </button>
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">Latitude</label>
+                      <input
+                        className="reg-input"
+                        placeholder="Ex: 5.345"
+                        value={producteurForm.latitude}
+                        onChange={(e) => setProducteurForm(prev => ({ ...prev, latitude: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="reg-field">
+                      <label className="reg-label">Longitude</label>
+                      <input
+                        className="reg-input"
+                        placeholder="Ex: -3.982"
+                        value={producteurForm.longitude}
+                        onChange={(e) => setProducteurForm(prev => ({ ...prev, longitude: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="reg-actions">
+                    <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setFormStep(2)}
+                      type="button"
+                    >
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      onClick={() => nextStep('producteur', 3)}
+                      type="button"
+                    >
+                      Étape suivante →
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Étape 4 - Confirmation */}
+              {formStep === 4 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">4</div>
+                    <div className="reg-step-title">Vérification & Confirmation</div>
+                  </div>
+
+                  <div className="reg-recap">
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Email</span>
+                      <span className="reg-recap-value">{producteurForm.email}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Téléphone</span>
+                      <span className="reg-recap-value">{producteurForm.phone}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Nom</span>
+                      <span className="reg-recap-value">{producteurForm.nomComplet}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Type</span>
+                      <span className="reg-recap-value">
+                        {PRODUCTEUR_TYPES[producteurForm.type]?.label || producteurForm.type}
+                      </span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Adresse</span>
+                      <span className="reg-recap-value">{producteurForm.adresse}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Quartier / Commune</span>
+                      <span className="reg-recap-value">{producteurForm.quartier}, {producteurForm.commune}</span>
+                    </div>
+                    {producteurForm.latitude && producteurForm.longitude && (
+                      <div className="reg-recap-row">
+                        <span className="reg-recap-label">GPS</span>
+                        <span className="reg-recap-value">
+                          {producteurForm.latitude}, {producteurForm.longitude}
                         </span>
                       </div>
-                      <div className="grid grid-cols-1 gap-1">
-                        {passwordRequirements.map(req => {
-                          const isValid = req.regex.test(formData.password)
-                          return (
-                            <div key={req.id} className="flex items-center gap-2 text-xs">
-                              {isValid ? (
-                                <CheckCircle className="h-3 w-3 text-green-500" />
-                              ) : (
-                                <XCircle className="h-3 w-3 text-gray-400" />
-                              )}
-                              <span className={isValid ? 'text-green-600' : 'text-gray-500'}>
-                                {req.label}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {errors.password && (
-                    <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <Lock className="h-4 w-4 text-emerald-600" />
-                    Confirmer <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      className={`w-full rounded-xl border-0 bg-gray-50 pl-11 pr-12 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                        errors.confirmPassword ? 'ring-2 ring-red-500' : ''
-                      }`}
-                      placeholder="••••••••"
-                    />
+                  <div
+                    className="reg-cgu"
+                    onClick={() => setProducteurForm(prev => ({ ...prev, cgu: !prev.cgu }))}
+                    role="button"
+                    tabIndex={0}
+                    onKeyPress={(e) => e.key === 'Enter' && setProducteurForm(prev => ({ ...prev, cgu: !prev.cgu }))}
+                  >
+                    <div className={`reg-cgu-box ${producteurForm.cgu ? 'checked' : ''}`}>
+                      {producteurForm.cgu && '✓'}
+                    </div>
+                    <span className="reg-cgu-text">
+                      J'accepte les <a href="#" onClick={(e) => e.preventDefault()}>CGU</a> et la{' '}
+                      <a href="#" onClick={(e) => e.preventDefault()}>Politique de Confidentialité</a> d'EcoCollect. *
+                    </span>
+                  </div>
+
+                  {renderMessage()}
+
+                  <div className="reg-actions">
                     <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setFormStep(3)}
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600"
                     >
-                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      disabled={isLoading}
+                      onClick={submitProducteur}
+                      type="button"
+                    >
+                      {isLoading ? 'Création en cours...' : '🚀 Créer mon compte →'}
                     </button>
                   </div>
-                  {errors.confirmPassword && (
-                    <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
-                  )}
-                </div>
-              </div>
+                </>
+              )}
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                  <Building2 className="h-4 w-4 text-emerald-600" />
-                  Type de producteur <span className="text-red-500">*</span>
-                </label>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {producerTypes.map(type => {
-                    const Icon = type.icon
-                    const isSelected = formData.producerType === type.id
-                    
-                    return (
-                      <button
-                        key={type.id}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, producerType: type.id }))}
-                        className={`group relative overflow-hidden rounded-xl p-4 transition-all ${
-                          isSelected
-                            ? 'bg-gradient-to-br from-emerald-50 to-green-50 ring-2 ring-emerald-600 shadow-lg scale-105'
-                            : 'bg-gray-50 ring-1 ring-gray-200 hover:ring-emerald-300 hover:shadow-md'
-                        }`}
-                      >
-                        <div className="relative">
-                          <div className={`mb-3 inline-flex rounded-lg p-2.5 ${
-                            isSelected ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-600'
-                          }`}>
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <h3 className="font-semibold text-gray-900">{type.label}</h3>
-                          <p className="text-xs text-gray-600 mt-1">{type.description}</p>
-                          <p className="text-xs text-emerald-600 mt-2 font-medium">{type.waste}</p>
+              <div className="reg-link">
+                Vous avez déjà un compte ? <a href="/login">Se connecter</a>
+              </div>
+            </div>
+          )}
+
+          {/* Écran 2 : Formulaire Collecteur */}
+          {currentScreen === 2 && selectedRole === 'collecteur' && (
+            <div className="reg-card">
+              <h1 className="reg-title">🚛 Inscription Collecteur</h1>
+
+              {/* Étape 1 - Informations de connexion */}
+              {formStep === 1 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">1</div>
+                    <div className="reg-step-title">Informations de connexion</div>
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">✉️ Email *</label>
+                      <input
+                        className="reg-input"
+                        type="email"
+                        placeholder="nom@email.com"
+                        value={collecteurForm.email}
+                        onChange={(e) => setCollecteurForm(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                      {errors.cEmail && <div className="reg-error">{errors.cEmail}</div>}
+                    </div>
+
+                    <div className="reg-field">
+                      <label className="reg-label">📱 Téléphone *</label>
+                      <input
+                        className="reg-input"
+                        type="tel"
+                        placeholder="+237 XX XX XX XX"
+                        value={collecteurForm.phone}
+                        onChange={(e) => setCollecteurForm(prev => ({ ...prev, phone: e.target.value }))}
+                      />
+                      {errors.cPhone && <div className="reg-error">{errors.cPhone}</div>}
+                    </div>
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">🔒 Mot de passe *</label>
+                      <div className="reg-pwd-wrap">
+                        <input
+                          className="reg-input"
+                          type={showPasswords.collecteur.pwd ? 'text' : 'password'}
+                          placeholder="Min. 8 caractères"
+                          value={collecteurForm.password}
+                          onChange={(e) => handlePasswordChange('collecteur', e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="reg-pwd-toggle"
+                          onClick={() => setShowPasswords(prev => ({
+                            ...prev,
+                            collecteur: { ...prev.collecteur, pwd: !prev.collecteur.pwd }
+                          }))}
+                        >
+                          {showPasswords.collecteur.pwd ? '🙈' : '👁️'}
+                        </button>
+                      </div>
+                      <div className="reg-pwd-meter">
+                        <div className="reg-pwd-bars">
+                          {[1, 2, 3, 4].map(i => (
+                            <div
+                              key={i}
+                              className="reg-pwd-bar"
+                              style={{
+                                background: passwordStrength.collecteur.score >= i ? '#2d8a5e' : '#d9e0d9'
+                              }}
+                            />
+                          ))}
                         </div>
-                      </button>
-                    )
-                  })}
-                </div>
-                {errors.producerType && (
-                  <p className="text-red-500 text-xs mt-1">{errors.producerType}</p>
-                )}
-              </div>
-            </div>
-          )}
+                        <span className="reg-pwd-label">{passwordStrength.collecteur.label}</span>
+                      </div>
+                      {errors.cPassword && <div className="reg-error">{errors.cPassword}</div>}
+                    </div>
 
-          {/* Étape 2: Localisation */}
-          {currentStep === 2 && (
-            <div className="space-y-6 animate-fadeIn">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Où collectons-nous ?</h2>
-                <p className="text-gray-600">Indiquez votre adresse de collecte</p>
-              </div>
-
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Ville <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="city"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      className={`w-full rounded-xl border-0 bg-gray-50 px-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                        errors.city ? 'ring-2 ring-red-500' : ''
-                      }`}
-                    >
-                      <option value="">Sélectionner une ville</option>
-                      <option value="douala">Douala</option>
-                      <option value="yaounde">Yaoundé</option>
-                      <option value="bafoussam">Bafoussam</option>
-                      <option value="buea">Buea</option>
-                      <option value="limbe">Limbe</option>
-                      <option value="kribi">Kribi</option>
-                    </select>
-                    {errors.city && (
-                      <p className="text-red-500 text-xs mt-1">{errors.city}</p>
-                    )}
+                    <div className="reg-field">
+                      <label className="reg-label">🔒 Confirmer le mot de passe *</label>
+                      <div className="reg-pwd-wrap">
+                        <input
+                          className="reg-input"
+                          type={showPasswords.collecteur.confirm ? 'text' : 'password'}
+                          placeholder="Confirmer"
+                          value={collecteurForm.passwordConfirm}
+                          onChange={(e) => setCollecteurForm(prev => ({ ...prev, passwordConfirm: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="reg-pwd-toggle"
+                          onClick={() => setShowPasswords(prev => ({
+                            ...prev,
+                            collecteur: { ...prev.collecteur, confirm: !prev.collecteur.confirm }
+                          }))}
+                        >
+                          {showPasswords.collecteur.confirm ? '🙈' : '👁️'}
+                        </button>
+                      </div>
+                      {errors.cPasswordConfirm && <div className="reg-error">{errors.cPasswordConfirm}</div>}
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Point de collecte <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="collectionPoint"
-                      value={formData.collectionPoint}
-                      onChange={handleInputChange}
-                      className={`w-full rounded-xl border-0 bg-gray-50 px-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                        errors.collectionPoint ? 'ring-2 ring-red-500' : ''
-                      }`}
+                  <div className="reg-actions">
+                    <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setCurrentScreen(1)}
+                      type="button"
                     >
-                      <option value="">Sélectionner un point</option>
-                      <option value="bonanjo">Bonanjo (Centre-ville)</option>
-                      <option value="akwa">Akwa</option>
-                      <option value="deido">Deido</option>
-                      <option value="bepanda">Bépanda</option>
-                      <option value="makepe">Makepe</option>
-                    </select>
-                    {errors.collectionPoint && (
-                      <p className="text-red-500 text-xs mt-1">{errors.collectionPoint}</p>
-                    )}
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      onClick={() => nextStep('collecteur', 1)}
+                      type="button"
+                    >
+                      Étape suivante →
+                    </button>
                   </div>
-                </div>
+                </>
+              )}
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Quartier <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="neighborhood"
-                    value={formData.neighborhood}
-                    onChange={handleInputChange}
-                    className={`w-full rounded-xl border-0 bg-gray-50 px-4 py-3.5 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-600 transition-all ${
-                      errors.neighborhood ? 'ring-2 ring-red-500' : ''
-                    }`}
-                    placeholder="Ex: Bonamoussadi, Ndogpassi..."
-                  />
-                  {errors.neighborhood && (
-                    <p className="text-red-500 text-xs mt-1">{errors.neighborhood}</p>
-                  )}
-                </div>
+              {/* Étape 2 - Identité & Type */}
+              {formStep === 2 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">2</div>
+                    <div className="reg-step-title">Identité & Type</div>
+                  </div>
 
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={handleLocationClick}
-                    disabled={locationLoading}
-                    className="w-full group relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-4 text-white font-medium transition-all hover:shadow-xl disabled:opacity-50"
+                  <div className="reg-field">
+                    <label className="reg-label">👤 Nom complet *</label>
+                    <input
+                      className="reg-input"
+                      placeholder="Votre nom"
+                      value={collecteurForm.nomComplet}
+                      onChange={(e) => setCollecteurForm(prev => ({ ...prev, nomComplet: e.target.value }))}
+                    />
+                    {errors.cNomComplet && <div className="reg-error">{errors.cNomComplet}</div>}
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">🔖 Type de collecteur *</label>
+                    <div className="reg-radio-group">
+                      {Object.entries(COLLECTEUR_TYPES).map(([key, { label, icon, desc }]) => (
+                        <div className="reg-radio-item" key={key}>
+                          <input
+                            type="radio"
+                            name="collecteurType"
+                            id={`ctype-${key}`}
+                            value={key}
+                            checked={collecteurForm.type === key}
+                            onChange={(e) => setCollecteurForm(prev => ({ ...prev, type: e.target.value }))}
+                          />
+                          <label className="reg-radio-label" htmlFor={`ctype-${key}`}>
+                            <span className="reg-radio-icon">{icon}</span>
+                            <span className="reg-radio-title">{label}</span>
+                            <span className="reg-radio-desc">{desc}</span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {errors.cType && <div className="reg-error">{errors.cType}</div>}
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">🪪 Numéro d'identité</label>
+                    <input
+                      className="reg-input"
+                      placeholder="N° CNI ou passeport"
+                      value={collecteurForm.identite}
+                      onChange={(e) => setCollecteurForm(prev => ({ ...prev, identite: e.target.value }))}
+                    />
+                    <div className="reg-hint">
+                      Requis pour les collecteurs indépendants
+                    </div>
+                  </div>
+
+                  <div className="reg-actions">
+                    <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setFormStep(1)}
+                      type="button"
+                    >
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      onClick={() => nextStep('collecteur', 2)}
+                      type="button"
+                    >
+                      Étape suivante →
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Étape 3 - Zone & Documents */}
+              {formStep === 3 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">3</div>
+                    <div className="reg-step-title">Zone & Documents</div>
+                  </div>
+
+                  <div className="reg-field">
+                    <label className="reg-label">🗺️ Nom de la zone *</label>
+                    <input
+                      className="reg-input"
+                      placeholder="Zone de collecte"
+                      value={collecteurForm.zone}
+                      onChange={(e) => setCollecteurForm(prev => ({ ...prev, zone: e.target.value }))}
+                    />
+                    {errors.cZone && <div className="reg-error">{errors.cZone}</div>}
+                  </div>
+
+                  <div className="reg-row">
+                    <div className="reg-field">
+                      <label className="reg-label">📌 Quartiers habituels</label>
+                      <input
+                        className="reg-input"
+                        placeholder="Séparés par virgules"
+                        value={collecteurForm.quartiers}
+                        onChange={(e) => setCollecteurForm(prev => ({ ...prev, quartiers: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="reg-field">
+                      <label className="reg-label">🏙️ Communes</label>
+                      <input
+                        className="reg-input"
+                        placeholder="Séparées par virgules"
+                        value={collecteurForm.communes}
+                        onChange={(e) => setCollecteurForm(prev => ({ ...prev, communes: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Upload de photo de profil */}
+                  <div className="reg-field">
+                    <label className="reg-label">📸 Photo de profil *</label>
+                    <div
+                      className="reg-upload-zone"
+                      onClick={() => fileInputRefs.photo.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      onKeyPress={(e) => e.key === 'Enter' && fileInputRefs.photo.current?.click()}
+                    >
+                      <div className="reg-upload-preview">
+                        {previews.photo ? (
+                          <img src={previews.photo} alt="Photo de profil" />
+                        ) : (
+                          <span>📷</span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="reg-upload-text">Cliquez pour choisir une photo</div>
+                        <div className="reg-upload-hint">JPG, PNG — Max. 5 Mo</div>
+                      </div>
+                    </div>
+                    <input
+                      ref={fileInputRefs.photo}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleFileUpload(e, 'photo')}
+                    />
+                    {errors.cPhoto && <div className="reg-error">{errors.cPhoto}</div>}
+                  </div>
+
+                  {/* Upload CNI Recto */}
+                  <div className="reg-field">
+                    <label className="reg-label">🪪 Photo CNI Recto *</label>
+                    <div
+                      className="reg-upload-zone"
+                      onClick={() => fileInputRefs.cniRecto.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      onKeyPress={(e) => e.key === 'Enter' && fileInputRefs.cniRecto.current?.click()}
+                    >
+                      <div className="reg-upload-preview">
+                        {previews.cniRecto ? (
+                          <img src={previews.cniRecto} alt="CNI Recto" />
+                        ) : (
+                          <span>📄</span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="reg-upload-text">Cliquez pour charger le recto</div>
+                        <div className="reg-upload-hint">JPG, PNG — Max. 5 Mo</div>
+                      </div>
+                    </div>
+                    <input
+                      ref={fileInputRefs.cniRecto}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleFileUpload(e, 'cniRecto')}
+                    />
+                    {errors.cCniRecto && <div className="reg-error">{errors.cCniRecto}</div>}
+                  </div>
+
+                  {/* Upload CNI Verso */}
+                  <div className="reg-field">
+                    <label className="reg-label">🪪 Photo CNI Verso *</label>
+                    <div
+                      className="reg-upload-zone"
+                      onClick={() => fileInputRefs.cniVerso.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      onKeyPress={(e) => e.key === 'Enter' && fileInputRefs.cniVerso.current?.click()}
+                    >
+                      <div className="reg-upload-preview">
+                        {previews.cniVerso ? (
+                          <img src={previews.cniVerso} alt="CNI Verso" />
+                        ) : (
+                          <span>📄</span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="reg-upload-text">Cliquez pour charger le verso</div>
+                        <div className="reg-upload-hint">JPG, PNG — Max. 5 Mo</div>
+                      </div>
+                    </div>
+                    <input
+                      ref={fileInputRefs.cniVerso}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleFileUpload(e, 'cniVerso')}
+                    />
+                    {errors.cCniVerso && <div className="reg-error">{errors.cCniVerso}</div>}
+                  </div>
+
+                  <div className="reg-actions">
+                    <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setFormStep(2)}
+                      type="button"
+                    >
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      onClick={() => nextStep('collecteur', 3)}
+                      type="button"
+                    >
+                      Étape suivante →
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Étape 4 - Confirmation */}
+              {formStep === 4 && (
+                <>
+                  <div className="reg-step-header">
+                    <div className="reg-step-num">4</div>
+                    <div className="reg-step-title">Vérification & Confirmation</div>
+                  </div>
+
+                  <div className="reg-recap">
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Email</span>
+                      <span className="reg-recap-value">{collecteurForm.email}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Téléphone</span>
+                      <span className="reg-recap-value">{collecteurForm.phone}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Nom</span>
+                      <span className="reg-recap-value">{collecteurForm.nomComplet}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Type</span>
+                      <span className="reg-recap-value">
+                        {COLLECTEUR_TYPES[collecteurForm.type]?.label || collecteurForm.type}
+                      </span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Zone</span>
+                      <span className="reg-recap-value">{collecteurForm.zone}</span>
+                    </div>
+                    <div className="reg-recap-row">
+                      <span className="reg-recap-label">Quartiers / Communes</span>
+                      <span className="reg-recap-value">
+                        {collecteurForm.quartiers} / {collecteurForm.communes}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="reg-cgu"
+                    onClick={() => setCollecteurForm(prev => ({ ...prev, cgu: !prev.cgu }))}
+                    role="button"
+                    tabIndex={0}
+                    onKeyPress={(e) => e.key === 'Enter' && setCollecteurForm(prev => ({ ...prev, cgu: !prev.cgu }))}
                   >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform" />
-                    <div className="relative flex items-center justify-center gap-3">
-                      {locationLoading ? (
-                        <>
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          <span>Recherche de votre position...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Globe className="h-5 w-5" />
-                          <span>📍 Utiliser ma position GPS</span>
-                        </>
-                      )}
+                    <div className={`reg-cgu-box ${collecteurForm.cgu ? 'checked' : ''}`}>
+                      {collecteurForm.cgu && '✓'}
                     </div>
-                  </button>
-                  {errors.location && (
-                    <p className="text-red-500 text-xs mt-2">{errors.location}</p>
-                  )}
-                </div>
-
-                <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-full bg-emerald-100 p-1.5">
-                      <Leaf className="h-4 w-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-emerald-900">Pourquoi votre localisation ?</p>
-                      <p className="text-xs text-emerald-700 mt-1">
-                        Elle nous permet d'optimiser nos tournées de collecte et de réduire notre empreinte carbone.
-                      </p>
-                    </div>
+                    <span className="reg-cgu-text">
+                      J'accepte les <a href="#" onClick={(e) => e.preventDefault()}>CGU</a> et la{' '}
+                      <a href="#" onClick={(e) => e.preventDefault()}>Politique de Confidentialité</a> d'EcoCollect. *
+                    </span>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Étape 3: Documents */}
-          {currentStep === 3 && (
-            <div className="space-y-6 animate-fadeIn">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Vérification d'identité</h2>
-                <p className="text-gray-600">Pour la sécurité de tous, nous vérifions votre identité</p>
-              </div>
+                  {renderMessage()}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Recto CNI */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Recto CNI <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      id="cniRecto"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, 'Recto')}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="cniRecto"
-                      className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
-                        errors.cniRecto 
-                          ? 'border-red-300 bg-red-50/50' 
-                          : formData.cniRecto 
-                            ? 'border-emerald-300 bg-emerald-50/50' 
-                            : 'border-gray-300 bg-gray-50 hover:border-emerald-400 hover:bg-emerald-50/30'
-                      }`}
+                  <div className="reg-actions">
+                    <button
+                      className="reg-btn reg-btn-outline"
+                      onClick={() => setFormStep(3)}
+                      type="button"
                     >
-                      {formData.cniRecto ? (
-                        <>
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-20" />
-                            <div className="relative rounded-full bg-emerald-100 p-3 mb-3">
-                              <Check className="h-8 w-8 text-emerald-600" />
-                            </div>
-                          </div>
-                          <span className="text-sm font-medium text-emerald-700 mb-1">Fichier téléchargé</span>
-                          <span className="text-xs text-emerald-600">{formData.cniRecto.name}</span>
-                          {uploadProgress.recto < 100 && (
-                            <div className="w-full mt-3 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-emerald-600 transition-all duration-300"
-                                style={{ width: `${uploadProgress.recto}%` }}
-                              />
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div className="rounded-full bg-gray-100 p-3 mb-3">
-                            <Camera className="h-8 w-8 text-gray-400" />
-                          </div>
-                          <span className="text-sm font-medium text-gray-700 mb-1">Recto de la CNI</span>
-                          <span className="text-xs text-gray-500">Cliquez pour télécharger</span>
-                          <span className="text-xs text-gray-400 mt-2">PNG, JPG (max 5MB)</span>
-                        </>
-                      )}
-                    </label>
-                  </div>
-                  {errors.cniRecto && (
-                    <p className="text-red-500 text-xs mt-1">{errors.cniRecto}</p>
-                  )}
-                </div>
-
-                {/* Verso CNI */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Verso CNI <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      id="cniVerso"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, 'Verso')}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="cniVerso"
-                      className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
-                        errors.cniVerso 
-                          ? 'border-red-300 bg-red-50/50' 
-                          : formData.cniVerso 
-                            ? 'border-emerald-300 bg-emerald-50/50' 
-                            : 'border-gray-300 bg-gray-50 hover:border-emerald-400 hover:bg-emerald-50/30'
-                      }`}
+                      ← Retour
+                    </button>
+                    <button
+                      className="reg-btn reg-btn-primary"
+                      disabled={isLoading}
+                      onClick={submitCollecteur}
+                      type="button"
                     >
-                      {formData.cniVerso ? (
-                        <>
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-20" />
-                            <div className="relative rounded-full bg-emerald-100 p-3 mb-3">
-                              <Check className="h-8 w-8 text-emerald-600" />
-                            </div>
-                          </div>
-                          <span className="text-sm font-medium text-emerald-700 mb-1">Fichier téléchargé</span>
-                          <span className="text-xs text-emerald-600">{formData.cniVerso.name}</span>
-                          {uploadProgress.verso < 100 && (
-                            <div className="w-full mt-3 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-emerald-600 transition-all duration-300"
-                                style={{ width: `${uploadProgress.verso}%` }}
-                              />
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div className="rounded-full bg-gray-100 p-3 mb-3">
-                            <Camera className="h-8 w-8 text-gray-400" />
-                          </div>
-                          <span className="text-sm font-medium text-gray-700 mb-1">Verso de la CNI</span>
-                          <span className="text-xs text-gray-500">Cliquez pour télécharger</span>
-                          <span className="text-xs text-gray-400 mt-2">PNG, JPG (max 5MB)</span>
-                        </>
-                      )}
-                    </label>
+                      {isLoading ? 'Création en cours...' : '🚀 Créer mon compte →'}
+                    </button>
                   </div>
-                  {errors.cniVerso && (
-                    <p className="text-red-500 text-xs mt-1">{errors.cniVerso}</p>
-                  )}
-                </div>
-              </div>
+                </>
+              )}
 
-              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">Photos requises pour la validation</p>
-                    <p className="text-xs text-amber-700 mt-1">
-                      • Recto et verso de votre CNI en cours de validité<br />
-                      • Photos claires et bien cadrées<br />
-                      • Format accepté : JPG, PNG - Max 5MB
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Conditions */}
-              <div className="pt-4">
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    name="acceptTerms"
-                    checked={formData.acceptTerms}
-                    onChange={handleInputChange}
-                    className="mt-1 w-5 h-5 text-emerald-600 border-2 border-gray-300 rounded-lg focus:ring-emerald-500 focus:ring-offset-0 transition-all group-hover:border-emerald-400"
-                  />
-                  <span className="text-sm text-gray-700">
-                    J'accepte les{' '}
-                    <a href="/terms" className="text-emerald-600 font-medium hover:underline hover:text-emerald-700">
-                      conditions générales
-                    </a>
-                    {' '}et la{' '}
-                    <a href="/privacy" className="text-emerald-600 font-medium hover:underline hover:text-emerald-700">
-                      politique de confidentialité
-                    </a>
-                    <span className="text-red-500 ml-1">*</span>
-                  </span>
-                </label>
-                {errors.acceptTerms && (
-                  <p className="text-red-500 text-xs mt-2">{errors.acceptTerms}</p>
-                )}
+              <div className="reg-link">
+                Vous avez déjà un compte ? <a href="/login">Se connecter</a>
               </div>
             </div>
           )}
 
-          {/* Messages d'erreur globaux */}
-          {errors.submit && (
-            <div className="mt-6 animate-slideDown rounded-xl bg-red-50 border border-red-200 p-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="text-sm text-red-800">{errors.submit}</p>
+          {/* Écran 3 : Succès */}
+          {currentScreen === 3 && (
+            <div className="reg-card reg-success-card">
+              <div className="reg-success-icon">🎉</div>
+              <h1 className="reg-success-title">
+                Félicitations{' '}
+                {selectedRole === 'producteur'
+                  ? producteurForm.nomComplet?.split(' ')[0]
+                  : collecteurForm.nomComplet?.split(' ')[0]} !
+              </h1>
+              <p className="reg-success-desc">
+                Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter
+                et commencer à utiliser EcoCollect.
+              </p>
+              <div className="reg-success-actions">
+                <button
+                  className="reg-btn reg-btn-primary"
+                  onClick={() => window.location.href = '/login'}
+                  type="button"
+                >
+                  Se connecter
+                </button>
+                <button
+                  className="reg-btn reg-btn-outline"
+                  onClick={() => window.location.href = '/'}
+                  type="button"
+                >
+                  Retour à l'accueil
+                </button>
               </div>
             </div>
           )}
-
-          {/* Navigation Buttons */}
-          <div className="flex gap-3 mt-8 pt-6 border-t border-gray-100">
-            {currentStep > 1 && (
-              <button
-                type="button"
-                onClick={handlePrevStep}
-                className="flex-1 px-6 py-3.5 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all"
-              >
-                Précédent
-              </button>
-            )}
-            
-            {currentStep < 3 ? (
-              <button
-                type="button"
-                onClick={handleNextStep}
-                className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 group"
-              >
-                Étape suivante
-                <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span>Création en cours...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-5 w-5 group-hover:rotate-12 transition-transform" />
-                    <span>Créer mon compte</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Lien connexion */}
-          <div className="text-center mt-6">
-            <p className="text-sm text-gray-600">
-              Vous avez déjà un compte ?{' '}
-              <a href="/login" className="text-emerald-600 font-semibold hover:text-emerald-700 hover:underline transition-all">
-                Se connecter
-              </a>
-            </p>
-          </div>
-        </form>
-
-        {/* Badge de confiance */}
-        <div className="mt-8 flex items-center justify-center gap-6 text-xs text-gray-500">
-          <div className="flex items-center gap-1">
-            <Shield className="h-4 w-4" />
-            Données sécurisées
-          </div>
-          <div className="flex items-center gap-1">
-            <Fingerprint className="h-4 w-4" />
-            Vérification KYC
-          </div>
-          <div className="flex items-center gap-1">
-            <Recycle className="h-4 w-4" />
-            Engagement éco
-          </div>
         </div>
       </div>
+    </>
+  );
+};
 
-      {/* Styles pour les animations */}
-      <style jsx>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+// ============================================================
+// STYLES CSS
+// ============================================================
 
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap');
 
-        .animate-slideDown {
-          animation: slideDown 0.3s ease-out;
-        }
+  .reg-root {
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    background: #f8faf8;
+    color: #1a1e1a;
+    position: relative;
+    overflow-x: hidden;
+  }
 
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease-out;
-        }
-      `}</style>
-    </div>
-  )
-}
+  .reg-ambient {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+  }
 
-export default Register
+  .reg-ambient-1 {
+    width: 600px;
+    height: 600px;
+    background: #2d8a5e;
+    top: -200px;
+    right: -200px;
+  }
+
+  .reg-ambient-2 {
+    width: 500px;
+    height: 500px;
+    background: #e0a020;
+    bottom: -150px;
+    left: -150px;
+  }
+
+  .reg-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .reg-nav img {
+    height: 40px;
+    border-radius: 8px;
+  }
+
+  .reg-nav-back {
+    background: none;
+    border: 1px solid #d9e0d9;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #5a655a;
+    transition: all 0.3s;
+  }
+
+  .reg-nav-back:hover {
+    background: #f0f3f0;
+    border-color: #2d8a5e;
+  }
+
+  .reg-page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .reg-progress-wrap {
+    margin-bottom: 32px;
+  }
+
+  .reg-progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .reg-progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .reg-step-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    background: #e8f3e8;
+    color: #5a655a;
+    border: 2px solid #d9e0d9;
+    transition: all 0.3s;
+  }
+
+  .reg-step-dot.active {
+    background: #2d8a5e;
+    color: white;
+    border-color: #2d8a5e;
+  }
+
+  .reg-step-dot.done {
+    background: #2d8a5e;
+    color: white;
+    border-color: #2d8a5e;
+  }
+
+  .reg-step-label {
+    font-size: 11px;
+    color: #9ca39c;
+    font-weight: 500;
+  }
+
+  .reg-step-label.active {
+    color: #2d8a5e;
+    font-weight: 600;
+  }
+
+  .reg-step-line {
+    width: 40px;
+    height: 3px;
+    background: #d9e0d9;
+    margin: 0 4px;
+    margin-bottom: 20px;
+    border-radius: 2px;
+    transition: background 0.3s;
+  }
+
+  .reg-step-line.done {
+    background: #2d8a5e;
+  }
+
+  .reg-card {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e8f0e8;
+  }
+
+  .reg-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .reg-subtitle {
+    text-align: center;
+    color: #5a655a;
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+
+  .reg-roles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .reg-role-card {
+    position: relative;
+    border: 2px solid #d9e0d9;
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+    background: white;
+    width: 100%;
+  }
+
+  .reg-role-card:hover {
+    border-color: #2d8a5e;
+    box-shadow: 0 4px 20px -4px rgba(45, 138, 94, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .reg-role-card.selected {
+    border-color: #2d8a5e;
+    background: #f0faf4;
+  }
+
+  .reg-role-check {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #2d8a5e;
+    color: white;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .reg-role-card.selected .reg-role-check {
+    display: flex;
+  }
+
+  .reg-role-icon {
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+
+  .reg-role-title {
+    font-weight: 700;
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .reg-role-desc {
+    font-size: 13px;
+    color: #5a655a;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .reg-role-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .reg-role-tag {
+    background: #e8f3e8;
+    color: #2d8a5e;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .reg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .reg-btn-primary {
+    background: #2d8a5e;
+    color: white;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .reg-btn-primary:hover:not(:disabled) {
+    background: #246e4b;
+    transform: translateY(-1px);
+  }
+
+  .reg-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .reg-btn-outline {
+    background: transparent;
+    border: 1px solid #d9e0d9;
+    color: #5a655a;
+  }
+
+  .reg-btn-outline:hover {
+    background: #f0f3f0;
+    border-color: #2d8a5e;
+  }
+
+  .reg-btn-gps {
+    background: #e8f3e8;
+    color: #2d8a5e;
+    border: 1px solid #c8e0c8;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .reg-btn-gps:hover {
+    background: #d8ecd8;
+  }
+
+  .reg-link {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+    color: #5a655a;
+  }
+
+  .reg-link a {
+    color: #2d8a5e;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .reg-link a:hover {
+    text-decoration: underline;
+  }
+
+  .reg-step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e8f3e8;
+  }
+
+  .reg-step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #2d8a5e;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .reg-step-title {
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .reg-field {
+    margin-bottom: 16px;
+  }
+
+  .reg-label {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: #1a1e1a;
+  }
+
+  .reg-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #d9e0d9;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: 'Outfit', sans-serif;
+    transition: all 0.3s;
+    background: white;
+  }
+
+  .reg-input:focus {
+    outline: none;
+    border-color: #2d8a5e;
+    box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.1);
+  }
+
+  .reg-error {
+    color: #dc2626;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .reg-hint {
+    color: #9ca39c;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .reg-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .reg-pwd-wrap {
+    position: relative;
+    display: flex;
+  }
+
+  .reg-pwd-wrap input {
+    flex: 1;
+    padding-right: 40px;
+  }
+
+  .reg-pwd-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+  }
+
+  .reg-pwd-meter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .reg-pwd-bars {
+    display: flex;
+    gap: 3px;
+  }
+
+  .reg-pwd-bar {
+    width: 30px;
+    height: 4px;
+    border-radius: 2px;
+    background: #d9e0d9;
+    transition: background 0.3s;
+  }
+
+  .reg-pwd-label {
+    font-size: 12px;
+    color: #5a655a;
+  }
+
+  .reg-radio-group {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .reg-radio-item {
+    position: relative;
+  }
+
+  .reg-radio-item input {
+    position: absolute;
+    opacity: 0;
+  }
+
+  .reg-radio-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px;
+    border: 2px solid #d9e0d9;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s;
+  }
+
+  .reg-radio-item input:checked + .reg-radio-label {
+    border-color: #2d8a5e;
+    background: #f0faf4;
+  }
+
+  .reg-radio-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+
+  .reg-radio-title {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .reg-radio-desc {
+    font-size: 11px;
+    color: #5a655a;
+  }
+
+  .reg-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .reg-upload-zone {
+    border: 2px dashed #d9e0d9;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .reg-upload-zone:hover {
+    border-color: #2d8a5e;
+    background: #f8fcf8;
+  }
+
+  .reg-upload-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #e8f3e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
+  .reg-upload-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .reg-upload-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1e1a;
+  }
+
+  .reg-upload-hint {
+    font-size: 12px;
+    color: #9ca39c;
+  }
+
+  .reg-recap {
+    background: #f8faf8;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .reg-recap-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e8f0e8;
+  }
+
+  .reg-recap-row:last-child {
+    border-bottom: none;
+  }
+
+  .reg-recap-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: #5a655a;
+  }
+
+  .reg-recap-value {
+    font-size: 13px;
+    color: #1a1e1a;
+    text-align: right;
+  }
+
+  .reg-cgu {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 16px 0;
+    cursor: pointer;
+  }
+
+  .reg-cgu-box {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border: 2px solid #d9e0d9;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+
+  .reg-cgu-box.checked {
+    background: #2d8a5e;
+    border-color: #2d8a5e;
+    color: white;
+  }
+
+  .reg-cgu-text {
+    font-size: 13px;
+    color: #5a655a;
+    line-height: 1.5;
+  }
+
+  .reg-cgu-text a {
+    color: #2d8a5e;
+    text-decoration: underline;
+  }
+
+  .reg-message {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  .reg-message.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+
+  .reg-message.info {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+  }
+
+  .reg-message.success {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+  }
+
+  .reg-success-card {
+    text-align: center;
+    padding: 48px 32px;
+  }
+
+  .reg-success-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+  }
+
+  .reg-success-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .reg-success-desc {
+    color: #5a655a;
+    font-size: 15px;
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .reg-success-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  @media (max-width: 640px) {
+    .reg-roles {
+      grid-template-columns: 1fr;
+    }
+
+    .reg-row {
+      grid-template-columns: 1fr;
+    }
+
+    .reg-radio-group {
+      grid-template-columns: 1fr;
+    }
+
+    .reg-success-actions {
+      flex-direction: column;
+    }
+
+    .reg-card {
+      padding: 20px;
+    }
+  }
+`;
+
+export default Register;

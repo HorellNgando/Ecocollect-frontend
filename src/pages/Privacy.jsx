@@ -1,286 +1,824 @@
-import { ArrowLeft, Shield, Database, Eye, Lock, Users, Cookie, Server, CheckCircle } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react';
+import logo from '../assets/logo.jpeg';
 
-const Privacy = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex items-center gap-4 mb-6">
-            <a 
-              href="/register" 
-              className="flex items-center gap-2 text-green-600 hover:text-green-700 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Retour
-            </a>
-            <div className="flex items-center gap-3">
-              <Shield className="w-8 h-8 text-green-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Politique de Confidentialité</h1>
-            </div>
-          </div>
+// ============================================================
+// CONSTANTES & UTILITAIRES
+// ============================================================
+
+const API_URL = 'https://ecocollect.cm';
+
+const STORAGE_KEYS = {
+  TOKEN: 'ecocollect_token',
+  USER: 'ecocollect_user',
+  ROLE: 'ecocollect_role',
+  REMEMBER: 'ecocollect_remember'
+};
+
+// Configuration des rôles
+const ROLE_CONFIG = {
+  admin: {
+    page: '/admin',
+    url: `${API_URL}/api/admin/connexion`,
+    userField: 'utilisateur',
+    bodyFormat: (identifiant, motDePasse) => ({ email: identifiant, motDePasse })
+  },
+  superviseur: {
+    page: '/superviseur',
+    url: `${API_URL}/api/superviseurs/connexion`,
+    userField: 'superviseur',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  },
+  gestionnaire: {
+    page: '/gestionnaire',
+    url: `${API_URL}/api/gestionnaires/connexion`,
+    userField: 'utilisateur',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  },
+  collecteur: {
+    page: '/collecteur',
+    url: `${API_URL}/api/collecteurs/connexion`,
+    userField: 'collecteur',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  },
+  producteur: {
+    page: '/producteur',
+    url: `${API_URL}/api/auth/connexion`,
+    userField: 'producteur',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  },
+  recycleur: {
+    page: '/recycleur',
+    url: `${API_URL}/api/recycleurs/connexion`,
+    userField: 'recycleur',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  },
+  sponsor: {
+    page: '/sponsor',
+    url: `${API_URL}/api/sponsors/connexion`,
+    userField: 'sponsor',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  },
+  ong: {
+    page: '/ong',
+    url: `${API_URL}/api/ongs/connexion`,
+    userField: 'ong',
+    bodyFormat: (identifiant, motDePasse) => ({ identifiant, motDePasse })
+  }
+};
+
+const ROLE_PRIORITY = ['admin', 'superviseur', 'gestionnaire', 'collecteur', 'recycleur', 'sponsor', 'ong', 'producteur'];
+
+// Validation d'email
+const isValidEmail = (email) => /\S+@\S+\.\S+/.test(email);
+
+// ============================================================
+// COMPOSANT PRINCIPAL
+// ============================================================
+
+const Login = () => {
+  // États du formulaire
+  const [formData, setFormData] = useState({
+    identifiant: '',
+    motDePasse: '',
+    rememberMe: false
+  });
+
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Effet de redirection si déjà connecté
+  useEffect(() => {
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    
+    if (token && role && ROLE_CONFIG[role]) {
+      window.location.href = ROLE_CONFIG[role].page;
+    }
+  }, []);
+
+  // Effet pour effacer les messages après un délai
+  useEffect(() => {
+    if (message.text) {
+      const timer = setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  // ============================================================
+  // GESTIONNAIRES D'ÉVÉNEMENTS
+  // ============================================================
+
+  const handleInputChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+
+    // Effacer l'erreur du champ modifié
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  }, [errors]);
+
+  // Validation du formulaire
+  const validateForm = useCallback(() => {
+    const newErrors = {};
+
+    if (!formData.identifiant.trim()) {
+      newErrors.identifiant = 'L\'email ou le téléphone est requis';
+    } else if (formData.identifiant.includes('@') && !isValidEmail(formData.identifiant)) {
+      newErrors.identifiant = 'L\'email n\'est pas valide';
+    }
+
+    if (!formData.motDePasse) {
+      newErrors.motDePasse = 'Le mot de passe est requis';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
+  // Sauvegarde des données d'authentification
+  const saveAuthData = useCallback((token, user, role) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      localStorage.setItem(STORAGE_KEYS.ROLE, role);
+      
+      if (formData.rememberMe) {
+        localStorage.setItem(STORAGE_KEYS.REMEMBER, 'true');
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.REMEMBER);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      return false;
+    }
+  }, [formData.rememberMe]);
+
+  // Extraction des données d'authentification
+  const extractAuthData = useCallback((data, role) => {
+    let token = null;
+    let user = null;
+
+    // Recherche du token
+    if (data.token) token = data.token;
+    else if (data.accessToken) token = data.accessToken;
+    else if (data.access_token) token = data.access_token;
+    else if (data.jwt) token = data.jwt;
+
+    // Recherche de l'utilisateur
+    const config = ROLE_CONFIG[role];
+    if (config && data[config.userField]) {
+      user = data[config.userField];
+    } else if (data.utilisateur) {
+      user = data.utilisateur;
+    } else if (data.user) {
+      user = data.user;
+    } else if (data[role]) {
+      user = data[role];
+    } else if (data.data?.user) {
+      user = data.data.user;
+    } else if (typeof data === 'object' && !data.token && data.email) {
+      user = data;
+    }
+
+    return { token, user };
+  }, []);
+
+  // Soumission du formulaire
+  const handleSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setMessage({ type: 'info', text: 'Connexion en cours...' });
+
+    let lastError = null;
+    let success = false;
+
+    // Essayer chaque rôle dans l'ordre de priorité
+    for (const role of ROLE_PRIORITY) {
+      if (success) break;
+      
+      const config = ROLE_CONFIG[role];
+      
+      try {
+        const response = await fetch(config.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config.bodyFormat(formData.identifiant, formData.motDePasse))
+        });
+
+        // Si endpoint non trouvé, passer au suivant
+        if (response.status === 404) continue;
+
+        const data = await response.json();
+
+        if (response.ok) {
+          const { token, user } = extractAuthData(data, role);
           
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-800">
-              Dernière mise à jour : {new Date().toLocaleDateString('fr-FR')}
-            </p>
+          if (token && user) {
+            if (saveAuthData(token, user, role)) {
+              setMessage({ 
+                type: 'success', 
+                text: `Connexion réussie ! Redirection vers votre espace ${role}...` 
+              });
+              
+              success = true;
+              setTimeout(() => {
+                window.location.href = config.page;
+              }, 1500);
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!success) {
+      setMessage({ 
+        type: 'error', 
+        text: lastError?.message || 'Identifiants incorrects ou compte non trouvé' 
+      });
+      setIsLoading(false);
+    }
+  }, [formData, validateForm, extractAuthData, saveAuthData]);
+
+  // ============================================================
+  // RENDU
+  // ============================================================
+
+  const renderMessage = () => {
+    if (!message.text) return null;
+    
+    const icons = {
+      success: 'fa-check-circle',
+      error: 'fa-exclamation-circle',
+      info: 'fa-info-circle'
+    };
+    
+    return (
+      <div className={`message ${message.type}`}>
+        <i className={`fas ${icons[message.type] || 'fa-info-circle'}`}></i>
+        {message.text}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <style>{styles}</style>
+      
+      <div className="ambient ambient-1" />
+      <div className="ambient ambient-2" />
+
+      <div className="login-container">
+        <a href="/" className="logo">
+          <img src={logo} alt="EcoCollect" className="logo-img" />
+        </a>
+
+        <h1>
+          <em>Connexion</em>
+        </h1>
+
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="form-group">
+            <label htmlFor="identifiant">
+              <i className="fas fa-envelope"></i>
+              Email ou Téléphone
+            </label>
+            <div className="input-wrap">
+              <i className={`fas ${formData.identifiant.includes('@') ? 'fa-envelope' : 'fa-phone'} input-icon`}></i>
+              <input
+                id="identifiant"
+                type="text"
+                name="identifiant"
+                value={formData.identifiant}
+                onChange={handleInputChange}
+                className={errors.identifiant ? 'error' : ''}
+                placeholder="votre@email.com"
+                disabled={isLoading}
+                autoComplete="username"
+              />
+            </div>
+            {errors.identifiant && <div className="error-text">{errors.identifiant}</div>}
           </div>
-        </div>
 
-        {/* Content */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 space-y-8">
-          {/* Introduction */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Shield className="w-6 h-6 text-green-600" />
-              Introduction
-            </h2>
-            <div className="prose prose-green max-w-none">
-              <p className="text-gray-700 leading-relaxed">
-                Chez EcoCollect, nous nous engageons à protéger votre vie privée et à sécuriser vos données 
-                personnelles. Cette politique de confidentialité explique quelles informations nous collectons, 
-                comment nous les utilisons, et comment nous les protégeons conformément à la législation camerounaise.
-              </p>
+          <div className="form-group">
+            <label htmlFor="motDePasse">
+              <i className="fas fa-lock"></i>
+              Mot de passe
+            </label>
+            <div className="input-wrap">
+              <i className="fas fa-lock input-icon"></i>
+              <input
+                id="motDePasse"
+                type={showPassword ? 'text' : 'password'}
+                name="motDePasse"
+                value={formData.motDePasse}
+                onChange={handleInputChange}
+                className={errors.motDePasse ? 'error' : ''}
+                placeholder="••••••••"
+                disabled={isLoading}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(prev => !prev)}
+                disabled={isLoading}
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              >
+                <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+              </button>
             </div>
-          </section>
-
-          {/* Données collectées */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Database className="w-6 h-6 text-green-600" />
-              1. Données que nous collectons
-            </h2>
-            <div className="space-y-4 text-gray-700">
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Données d'identification</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Nom et prénom</li>
-                  <li>Adresse email et/ou numéro de téléphone</li>
-                  <li>Type de producteur (ménage, commerce, entreprise)</li>
-                  <li>Localisation (ville, quartier, point de collecte)</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Données de service</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Historique des déclarations de déchets</li>
-                  <li>Types et quantités de déchets déclarés</li>
-                  <li>Statut des collectes et suivi</li>
-                  <li>Points et récompenses accumulés</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Données techniques</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Adresse IP et type d'appareil</li>
-                  <li>Données de localisation GPS (avec consentement)</li>
-                  <li>Préférences et paramètres de l'application</li>
-                  <li>Cookies et données de navigation</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Données sensibles</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Copie de pièce d'identité (CNI recto/verso)</li>
-                  <li>Images et documents uploadés</li>
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          {/* Utilisation des données */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Users className="w-6 h-6 text-green-600" />
-              2. Comment nous utilisons vos données
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <p>Nous utilisons vos données pour :</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Fournir et améliorer nos services de collecte de déchets</li>
-                <li>Coordonner les collectes avec nos partenaires</li>
-                <li>Calculer et attribuer les points de récompense</li>
-                <li>Personnaliser votre expérience utilisateur</li>
-                <li>Communiquer avec vous concernant votre compte et les services</li>
-                <li>Analyser les tendances pour optimiser notre réseau de collecte</li>
-                <li>Assurer la sécurité et prévenir les fraudes</li>
-                <li>Respecter nos obligations légales et réglementaires</li>
-              </ul>
-            </div>
-          </section>
-
-          {/* Base légale */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-              3. Base légale du traitement
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <p>
-                Le traitement de vos données repose sur les bases légales suivantes conformément à la législation camerounaise :
-              </p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Consentement :</strong> Pour les données sensibles et la géolocalisation</li>
-                <li><strong>Exécution du contrat :</strong> Pour fournir nos services</li>
-                <li><strong>Obligation légale :</strong> Pour la lutte contre le blanchiment et la fraude</li>
-                <li><strong>Intérêt légitime :</strong> Pour l'amélioration de nos services</li>
-              </ul>
-            </div>
-          </section>
-
-          {/* Conservation */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Lock className="w-6 h-6 text-green-600" />
-              4. Durée de conservation
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Périodes de conservation</h3>
-                <ul className="space-y-2 text-sm">
-                  <li><strong>Compte utilisateur :</strong> Tant que le compte est actif</li>
-                  <li><strong>Données de service :</strong> 5 ans après la dernière collecte</li>
-                  <li><strong>CNI et documents :</strong> 10 ans après clôture du compte</li>
-                  <li><strong>Données techniques :</strong> 13 mois maximum</li>
-                  <li><strong>Cookies :</strong> Session ou 12 mois selon le type</li>
-                </ul>
-              </div>
-              <p>
-                À l'expiration de ces délais, les données sont définitivement supprimées ou anonymisées.
-              </p>
-            </div>
-          </section>
-
-          {/* Partage des données */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Eye className="w-6 h-6 text-green-600" />
-              5. Partage de vos données
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <p>Nous ne partageons vos données que dans les cas suivants :</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Collecteurs agréés :</strong> Pour coordonner les collectes</li>
-                <li><strong>Partenaires services :</strong> Pour les récompenses et avantages</li>
-                <li><strong>Autorités compétentes :</strong> Sur demande légale ou judiciaire</li>
-                <li><strong>Prestataires techniques :</strong> Hébergement et maintenance</li>
-              </ul>
-              <p>
-                Tous nos partenaires sont tenus par des contrats de confidentialité stricts.
-              </p>
-            </div>
-          </section>
-
-          {/* Sécurité */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Server className="w-6 h-6 text-green-600" />
-              6. Sécurité des données
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <p>
-                Nous mettons en œuvre des mesures de sécurité robustes pour protéger vos données :
-              </p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Chiffrement SSL/TLS pour toutes les communications</li>
-                <li>Chiffrement des données sensibles dans notre base de données</li>
-                <li>Contrôle d'accès strict et authentification multi-facteurs</li>
-                <li>Sauvegardes régulières et sécurisées</li>
-                <li>Audits de sécurité réguliers</li>
-                <li>Formation du personnel à la protection des données</li>
-              </ul>
-            </div>
-          </section>
-
-          {/* Cookies */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Cookie className="w-6 h-6 text-green-600" />
-              7. Cookies et traceurs
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <p>
-                Nous utilisons des cookies pour améliorer votre expérience :
-              </p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Cookies essentiels :</strong> Pour le fonctionnement de base du site</li>
-                <li><strong>Cookies de performance :</strong> Pour analyser l'utilisation du service</li>
-                <li><strong>Cookies de fonctionnalité :</strong> Pour mémoriser vos préférences</li>
-              </ul>
-              <p>
-                Vous pouvez gérer vos préférences cookies dans les paramètres de votre navigateur.
-              </p>
-            </div>
-          </section>
-
-          {/* Droits utilisateurs */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Users className="w-6 h-6 text-green-600" />
-              8. Vos droits sur vos données
-            </h2>
-            <div className="space-y-3 text-gray-700">
-              <p>Conformément à la législation, vous disposez des droits suivants :</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Droit d'accès :</strong> Consulter vos données personnelles</li>
-                <li><strong>Droit de rectification :</strong> Corriger vos données inexactes</li>
-                <li><strong>Droit de suppression :</strong> Demander la suppression de vos données</li>
-                <li><strong>Droit de limitation :</strong> Limiter le traitement de vos données</li>
-                <li><strong>Droit de portabilité :</strong> Recevoir vos données dans un format lisible</li>
-                <li><strong>Droit d'opposition :</strong> Vous opposer au traitement pour motifs légitimes</li>
-              </ul>
-              <p>
-                Pour exercer ces droits, contactez-nous à privacy@ecocollect.bf
-              </p>
-            </div>
-          </section>
-
-          {/* Modifications */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">9. Modifications de la politique</h2>
-            <div className="space-y-3 text-gray-700">
-              <p>
-                Nous pouvons modifier cette politique de confidentialité pour refléter les changements 
-                dans nos pratiques ou pour des raisons réglementaires.
-              </p>
-              <p>
-                Les modifications seront publiées sur cette page avec la date de mise à jour. 
-                Les changements importants feront l'objet d'une notification directe aux utilisateurs.
-              </p>
-            </div>
-          </section>
-
-          {/* Contact */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">10. Contact DPO</h2>
-            <div className="space-y-3 text-gray-700">
-              <p>
-                Pour toute question concernant cette politique ou pour exercer vos droits, 
-                contactez notre Délégué à la Protection des Données :
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <ul className="space-y-2 text-sm">
-                  <li><strong>Email :</strong> dpo@ecocollect.cm</li>
-                  <li><strong>Téléphone :</strong> +237 XX XX XX XX</li>
-                  <li><strong>Adresse :</strong> Douala, Cameroun</li>
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          {/* Footer */}
-          <div className="border-t pt-6 mt-8">
-            <p className="text-center text-sm text-gray-600">
-              © 2024 EcoCollect. Tous droits réservés.
-            </p>
+            {errors.motDePasse && <div className="error-text">{errors.motDePasse}</div>}
           </div>
+
+          <div className="checkbox-group">
+            <label className="checkbox-label" htmlFor="rememberMe">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                name="rememberMe"
+                checked={formData.rememberMe}
+                onChange={handleInputChange}
+                disabled={isLoading}
+              />
+              Se souvenir de moi
+            </label>
+            <a href="/forgot-password" className="forgot-link">
+              Mot de passe oublié ?
+            </a>
+          </div>
+
+          {renderMessage()}
+
+          <button 
+            type="submit" 
+            className="btn" 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <div className="spinner"></div>
+                Connexion en cours...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-sign-in-alt"></i>
+                Se connecter
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="links">
+          <p>
+            Pas encore de compte ? <a href="/register">S'inscrire</a>
+          </p>
+          <a href="/" className="back-home">
+            <i className="fas fa-arrow-left"></i>
+            Retour à l'accueil
+          </a>
         </div>
       </div>
-    </div>
-  )
-}
 
-export default Privacy
+      {/* Font Awesome chargé une seule fois */}
+      <link 
+        rel="stylesheet" 
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+      />
+    </>
+  );
+};
+
+// ============================================================
+// STYLES CSS
+// ============================================================
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap');
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --background: #f8faf8;
+    --foreground: #1a1e1a;
+    --card: #ffffff;
+    --card-foreground: #1a1e1a;
+    --primary: #2d8a5e;
+    --primary-foreground: #ffffff;
+    --secondary: #e8f3e8;
+    --secondary-foreground: #1a5c3a;
+    --muted: #f0f3f0;
+    --muted-foreground: #5a655a;
+    --accent: #e0a020;
+    --accent-foreground: #3d2d06;
+    --destructive: #dc2626;
+    --border: #d9e0d9;
+    --ring: #2d8a5e;
+    --radius: 0.75rem;
+    --radius-lg: 1.25rem;
+    --radius-xl: 1.75rem;
+    --shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 40px -8px rgba(0, 0, 0, 0.08);
+    --shadow-colored: 0 4px 20px -4px rgba(45, 138, 94, 0.15);
+    --ff-head: 'DM Serif Display', Georgia, serif;
+    --ff-body: 'Outfit', sans-serif;
+    --ease: cubic-bezier(.4, 0, .2, 1);
+    --spring: cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  body {
+    font-family: var(--ff-body);
+    background: var(--background);
+    color: var(--foreground);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: .015;
+  }
+
+  .ambient {
+    position: fixed;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 50%;
+    filter: blur(100px);
+  }
+
+  .ambient-1 {
+    width: 600px;
+    height: 400px;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse, rgba(45, 138, 94, 0.03) 0%, transparent 70%);
+  }
+
+  .ambient-2 {
+    width: 400px;
+    height: 300px;
+    bottom: 10%;
+    right: 5%;
+    background: radial-gradient(ellipse, rgba(45, 138, 94, 0.02) 0%, transparent 70%);
+  }
+
+  .login-container {
+    max-width: 450px;
+    width: 100%;
+    background: var(--card);
+    border-radius: var(--radius-xl);
+    padding: 2.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    animation: fadeIn 0.5s var(--spring) both;
+    position: relative;
+    z-index: 1;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    text-decoration: none;
+  }
+
+  .logo-img {
+    height: 70px;
+    width: auto;
+    border-radius: 15px;
+    transition: transform 0.3s var(--spring);
+  }
+
+  .logo-img:hover {
+    transform: scale(1.05);
+  }
+
+  h1 {
+    font-family: var(--ff-head);
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 1.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--foreground);
+  }
+
+  h1 em {
+    color: var(--primary);
+    font-style: italic;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--foreground);
+    letter-spacing: 0.02em;
+  }
+
+  label i {
+    color: var(--primary);
+    margin-right: 0.5rem;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+
+  .input-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted-foreground);
+    font-size: 1rem;
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    padding: 0.9rem 1rem 0.9rem 2.5rem;
+    border-radius: var(--radius);
+    background: var(--muted);
+    border: 1.5px solid var(--border);
+    color: var(--foreground);
+    font-size: 0.95rem;
+    font-family: var(--ff-body);
+    transition: all 0.2s var(--ease);
+    outline: none;
+  }
+
+  input:focus {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.1);
+  }
+
+  input.error {
+    border-color: var(--destructive);
+  }
+
+  input:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .toggle-password {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted-foreground);
+    font-size: 1.1rem;
+    transition: color 0.2s;
+    padding: 0;
+  }
+
+  .toggle-password:hover:not(:disabled) {
+    color: var(--primary);
+  }
+
+  .toggle-password:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .error-text {
+    color: var(--destructive);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    font-weight: 500;
+  }
+
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 1.5rem 0;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: var(--foreground);
+    font-size: 0.9rem;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+  }
+
+  .checkbox-label input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .forgot-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: color 0.2s;
+  }
+
+  .forgot-link:hover {
+    text-decoration: underline;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    border-radius: 100px;
+    cursor: pointer;
+    font-family: var(--ff-body);
+    font-weight: 700;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    transition: all 0.3s var(--spring);
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(45, 138, 94, 0.2);
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(45, 138, 94, 0.3);
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .spinner {
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .message {
+    padding: 1rem;
+    margin-top: 1rem;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    animation: slideIn 0.3s var(--ease);
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .message.success {
+    background: var(--secondary);
+    color: var(--secondary-foreground);
+    border: 1px solid var(--primary);
+  }
+
+  .message.error {
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--destructive);
+    border: 1px solid var(--destructive);
+  }
+
+  .message.info {
+    background: rgba(45, 138, 94, 0.05);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+
+  .links {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+  }
+
+  .links p {
+    margin-bottom: 1rem;
+  }
+
+  .links a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+  }
+
+  .links a:hover {
+    text-decoration: underline;
+  }
+
+  .back-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .back-home:hover {
+    color: var(--primary);
+    transform: translateX(-3px);
+  }
+
+  @media (max-width: 480px) {
+    .login-container {
+      padding: 2rem 1.5rem;
+    }
+    
+    .logo-img {
+      height: 60px;
+    }
+  }
+`;
+
+export default Login;

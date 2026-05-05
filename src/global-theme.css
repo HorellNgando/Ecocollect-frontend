@@ -1,0 +1,218 @@
+/* ============================================
+   global-theme.css – Version strictement chromatique
+   Uniquement les couleurs, la typographie et le mode sombre.
+   Aucune propriété de mise en page (margin, padding, position, width, etc.)
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap');
+
+/* === VARIABLES DE THÈME (globales) === */
+:root {
+  --background: #f8faf8;
+  --foreground: #1a1e1a;
+  --card: #ffffff;
+  --primary: #71B347;
+  --primary-rgb: 113, 179, 71;
+  --secondary: #eef6e6;
+  --secondary-foreground: #2d5a12;
+  --muted: #f0f3f0;
+  --muted-foreground: #5a655a;
+  --accent: #e0a020;
+  --accent-foreground: #3d2d06;
+  --border: #d9e0d9;
+  --shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
+  --shadow-lg: 0 10px 40px -8px rgba(0,0,0,0.08);
+}
+
+.dark-mode {
+  --background: #0f1a0a;
+  --foreground: #e8efe8;
+  --card: #162010;
+  --primary: #71B347;
+  --secondary: #1a2a14;
+  --secondary-foreground: #9fd38a;
+  --muted: #1e2e18;
+  --muted-foreground: #9aa89e;
+  --border: #2a3d22;
+  --shadow: 0 4px 20px -4px rgba(0,0,0,0.3);
+  --shadow-lg: 0 10px 40px -8px rgba(0,0,0,0.5);
+}
+
+/* === STYLES DE BASE (seulement couleur et police) === */
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* === SURCHARGES POUR LE MODE SOMBRE (ciblent les classes Tailwind courantes) === */
+.dark-mode .bg-white,
+.dark-mode .bg-gray-50,
+.dark-mode .bg-green-50 {
+  background-color: var(--card) !important;
+}
+
+.dark-mode .text-gray-900,
+.dark-mode .text-gray-800,
+.dark-mode .text-gray-700 {
+  color: var(--foreground) !important;
+}
+
+.dark-mode .text-gray-600,
+.dark-mode .text-gray-500,
+.dark-mode .text-gray-400 {
+  color: var(--muted-foreground) !important;
+}
+
+.dark-mode .border-green-100,
+.dark-mode .border-gray-200 {
+  border-color: var(--border) !important;
+}
+
+.dark-mode .bg-green-600 {
+  background-color: var(--primary) !important;
+}
+
+.dark-mode .bg-green-100 {
+  background-color: var(--secondary) !important;
+  color: var(--secondary-foreground) !important;
+}
+
+.dark-mode .shadow-lg {
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.dark-mode .from-green-50,
+.dark-mode .via-white,
+.dark-mode .to-green-50 {
+  background: var(--background) !important;
+}
+
+/* === INPUTS (couleur seulement) === */
+.dark-mode input,
+.dark-mode textarea,
+.dark-mode select {
+  background-color: var(--muted) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+.dark-mode input::placeholder,
+.dark-mode textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.dark-mode input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(113, 179, 71, 0.2) !important;
+}
+
+/* === COMPOSANT REGISTER (classes reg-* : uniquement couleurs) === */
+.dark-mode .reg-root {
+  background: var(--background) !important;
+}
+
+.dark-mode .reg-card,
+.dark-mode .reg-role-card,
+.dark-mode .reg-recap,
+.dark-mode .reg-upload-zone {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+.dark-mode .reg-nav-back,
+.dark-mode .reg-btn-outline {
+  background: transparent !important;
+  border-color: var(--border) !important;
+  color: var(--muted-foreground) !important;
+}
+.dark-mode .reg-nav-back:hover,
+.dark-mode .reg-btn-outline:hover {
+  background: var(--muted) !important;
+  border-color: var(--primary) !important;
+}
+
+.dark-mode .reg-input {
+  background: var(--muted) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+.dark-mode .reg-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(113, 179, 71, 0.2) !important;
+}
+
+.dark-mode .reg-label,
+.dark-mode .reg-step-title,
+.dark-mode .reg-radio-title {
+  color: var(--foreground) !important;
+}
+
+.dark-mode .reg-step-dot {
+  background: var(--muted) !important;
+  border-color: var(--border) !important;
+  color: var(--muted-foreground) !important;
+}
+.dark-mode .reg-step-dot.active,
+.dark-mode .reg-step-dot.done {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: white !important;
+}
+.dark-mode .reg-step-line {
+  background: var(--border) !important;
+}
+.dark-mode .reg-step-line.done {
+  background: var(--primary) !important;
+}
+
+.dark-mode .reg-role-tag {
+  background: var(--secondary) !important;
+  color: var(--secondary-foreground) !important;
+}
+
+.dark-mode .reg-radio-label {
+  border-color: var(--border) !important;
+  background: var(--card) !important;
+}
+.dark-mode .reg-radio-item input:checked + .reg-radio-label {
+  border-color: var(--primary) !important;
+  background: rgba(113, 179, 71, 0.1) !important;
+}
+
+.dark-mode .reg-recap-row {
+  border-bottom-color: var(--border) !important;
+}
+.dark-mode .reg-recap-label {
+  color: var(--muted-foreground) !important;
+}
+.dark-mode .reg-recap-value {
+  color: var(--foreground) !important;
+}
+
+.dark-mode .reg-cgu-box {
+  border-color: var(--border) !important;
+  background: var(--muted) !important;
+}
+.dark-mode .reg-cgu-box.checked {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.dark-mode .reg-message.error {
+  background: rgba(220, 38, 38, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+  color: #fca5a5 !important;
+}
+.dark-mode .reg-message.success {
+  background: rgba(34, 197, 94, 0.1) !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  color: #86efac !important;
+}
+.dark-mode .reg-message.info {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #93c5fd !important;
+}

@@ -1,21 +1,6 @@
 import { useState } from 'react'
 import { 
-  Trash2, 
-  Package, 
-  Clock, 
-  CheckCircle, 
-  TrendingUp, 
-  Award, 
-  Plus, 
-  BarChart3, 
-  Users, 
-  MapPin, 
-  Star, 
-  ArrowRight, 
-  Calendar,
-  Leaf,
-  Recycle,
-  Target
+  Trash2, Package, Clock,  CheckCircle,  TrendingUp,  Award,  Plus,  BarChart3,  Users,  MapPin,  Star, ArrowRight, Calendar,Leaf,Recycle, Target
 } from 'lucide-react'
 import Layout from '../components/Layout'
 

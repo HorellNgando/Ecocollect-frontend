@@ -5,20 +5,7 @@ import {
   CheckCircle, 
   User, 
   Phone, 
-  MapPin, 
-  Calendar, 
-  Package, 
-  Scale, 
-  AlertCircle, 
-  Star, 
-  MessageCircle,
-  Edit,
-  Download,
-  Share,
-  Trash2,
-  TrendingUp,
-  Award,
-  Filter
+  MapPin, Calendar, Package, Scale, AlertCircle, Star, MessageCircle,Edit,Download,Share,Trash2,TrendingUp,Award,Filter
 } from 'lucide-react'
 import Layout from '../components/Layout'
 

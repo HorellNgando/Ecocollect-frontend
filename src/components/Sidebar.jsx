@@ -46,7 +46,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
       id: 'dashboard',
       label: 'Tableau de bord',
       icon: BarChart3,
-      href: '/dashboard',
+      href: '/collecteur',
       badge: null
     },
     {
@@ -94,7 +94,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
       id: 'dashboard',
       label: 'Tableau de bord',
       icon: BarChart3,
-      href: '/collector/dashboard',
+      href: '/collecteur',
       badge: null
     },
     {
@@ -129,14 +129,14 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
     },
   ]
 
-  const menuItems = userRole === 'collector' ? collectorMenuItems : producerMenuItems
+  const menuItems = userRole === 'collecteur' ? collectorMenuItems : producerMenuItems
 
   const secondaryMenuItems = [
     {
       id: 'profile',
       label: 'Mon profil',
       icon: User,
-      href: userRole === 'collector' ? '/collector/profile' : '/profile',
+      href: userRole === 'collecteur' ? '/collector/profile' : '/profile',
       badge: null
     },
     {
@@ -170,19 +170,19 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
         }`}>
           {/* Header */}
           <div className={`p-6 ${
-            userRole === 'collector' 
+            userRole === 'collecteur' 
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
               : 'bg-gradient-to-r from-green-600 to-green-700'
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-lg flex items-center justify-center">
-                  <img src="/1.png" alt="EcoCollect" className="w-24 h-auto" />
+                  
                 </div>
                 <div>
                   <h1 className="text-white font-bold text-lg">EcoCollect</h1>
                   <p className="text-white/80 text-xs">
-                    {userRole === 'collector' ? 'Espace Collecteur' : 'Plateforme de collecte'}
+                    {userRole === 'collecteur' ? 'Espace Collecteur' : 'Plateforme de collecte'}
                   </p>
                 </div>
               </div>
@@ -199,16 +199,16 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
           <div className="p-4 border-b">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                userRole === 'collector' ? 'bg-blue-100' : 'bg-gray-200'
+                userRole === 'collecteur' ? 'bg-blue-100' : 'bg-gray-200'
               }`}>
                 <User className={`w-5 h-5 ${
-                  userRole === 'collector' ? 'text-blue-600' : 'text-gray-600'
+                  userRole === 'collecteur' ? 'text-blue-600' : 'text-gray-600'
                 }`} />
               </div>
               <div>
                 <p className="font-medium text-gray-900">Jean Dupont</p>
                 <p className="text-xs text-gray-500">
-                  {userRole === 'collector' ? 'Collecteur • Douala' : 'Ménage • Douala'}
+                  {userRole === 'collecteur' ? 'Collecteur • Douala' : 'Ménage • Douala'}
                 </p>
               </div>
             </div>
@@ -243,7 +243,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
                       >
                         <Icon className={`w-5 h-5 ${isActive 
                           ? userRole === 'collector' ? 'text-blue-600' : 'text-green-600'
-                          : 'text-gray-400 group-hover:text-' + (userRole === 'collector' ? 'blue-600' : 'green-600')
+                          : 'text-gray-400 group-hover:text-' + (userRole === 'collecteur' ? 'blue-600' : 'green-600')
                         }`} />
                         <span className="font-medium group-hover:text-gray-700">{item.label}</span>
                       </a>
@@ -271,7 +271,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
                         className={`
                           flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
                           ${isActive 
-                            ? userRole === 'collector'
+                            ? userRole === 'collecteur'
                               ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 shadow-sm' 
                               : 'bg-green-50 text-green-700 border-l-4 border-green-600 shadow-sm'
                             : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 hover:shadow-md'
@@ -308,18 +308,16 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
       <div className="hidden lg:block fixed top-0 left-0 h-screen bg-white shadow-xl z-50 w-72 overflow-hidden flex flex-col">
         {/* Header */}
         <div className={`p-6 ${
-          userRole === 'collector' 
+          userRole === 'collecteur' 
             ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
             : 'bg-gradient-to-r from-green-600 to-green-700'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-lg flex items-center justify-center">
-                  <img src="/1.png" alt="EcoCollect" className="w-24 h-auto" />
-                </div>
+            
             <div>
               <h1 className="text-white font-bold text-lg">EcoCollect</h1>
               <p className="text-white/80 text-xs">
-                {userRole === 'collector' ? 'Espace Collecteur' : 'Plateforme de collecte'}
+                {userRole === 'collecteur' ? 'Espace Collecteur' : 'Plateforme de collecte'}
               </p>
             </div>
           </div>
@@ -373,8 +371,8 @@ const Sidebar = ({ isOpen, toggleSidebar, currentPage, userRole = 'producer' }) 
                     >
                       <div className="flex items-center gap-3">
                         <Icon className={`w-5 h-5 ${isActive 
-                          ? userRole === 'collector' ? 'text-blue-600' : 'text-green-600'
-                          : 'text-gray-400 group-hover:text-' + (userRole === 'collector' ? 'blue-600' : 'green-600')
+                          ? userRole === 'collecteur' ? 'text-blue-600' : 'text-green-600'
+                          : 'text-gray-400 group-hover:text-' + (userRole === 'collecteur' ? 'blue-600' : 'green-600')
                         }`} />
                         <span className="font-medium">{item.label}</span>
                       </div>
